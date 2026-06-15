@@ -1,0 +1,42 @@
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL,
+    team TEXT NOT NULL DEFAULT 'Geral',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS warehouses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    section TEXT NOT NULL,
+    location TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    designation TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    weighted_price REAL NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS inventory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL,
+    warehouse_id INTEGER NOT NULL,
+    quantity REAL NOT NULL DEFAULT 0,
+    min_quantity REAL NOT NULL DEFAULT 0,
+    FOREIGN KEY(item_id) REFERENCES items(id),
+    FOREIGN KEY(warehouse_id) REFERENCES warehouses(id)
+);
+CREATE TABLE IF NOT EXISTS requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    requester TEXT NOT NULL,
+    team TEXT NOT NULL,
+    item_id INTEGER NOT NULL,
+    quantity REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Pendente',
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(item_id) REFERENCES items(id)
+);
