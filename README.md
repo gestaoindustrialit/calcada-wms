@@ -28,3 +28,13 @@ php -S localhost:8000 -t public
 ```
 
 A base de dados SQLite é criada automaticamente em `data/wms.sqlite` na primeira execução, caso ainda não tenha sido criada pelo instalador.
+
+
+## Login de administração
+
+O WMS exige autenticação antes de abrir as páginas de gestão. As credenciais iniciais são:
+
+- Utilizador: `admin`
+- Palavra-passe: `admin123`
+
+Em produção, configure as variáveis de ambiente `WMS_ADMIN_USER` e `WMS_ADMIN_PASSWORD` para substituir estes valores.

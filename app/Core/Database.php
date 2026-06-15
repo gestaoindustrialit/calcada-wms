@@ -19,10 +19,22 @@ class Database
         return self::$pdo;
     }
 
+    private static function ensureColumn(string $table, string $column, string $definition): void
+    {
+        $columns = self::$pdo->query('PRAGMA table_info(' . $table . ')')->fetchAll();
+        foreach ($columns as $existing) {
+            if ($existing['name'] === $column) {
+                return;
+            }
+        }
+        self::$pdo->exec('ALTER TABLE ' . $table . ' ADD COLUMN ' . $column . ' ' . $definition);
+    }
+
     private static function migrate(): void
     {
         $sql = file_get_contents(dirname(__DIR__, 2) . '/database.sql');
         self::$pdo->exec($sql);
+        self::ensureColumn('requests', 'warehouse_id', 'INTEGER');
         $count = (int) self::$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
         if ($count === 0) {
             self::$pdo->exec("INSERT INTO users (name,email,role,team) VALUES
@@ -39,10 +51,10 @@ class Database
                 ('Luvas nitrilo','Caixa 100 unidades','cx',8.90)");
             self::$pdo->exec("INSERT INTO inventory (item_id,warehouse_id,quantity,min_quantity) VALUES
                 (1,1,2500,500),(2,2,80,20),(3,1,120,30)");
-            self::$pdo->exec("INSERT INTO requests (requester,team,item_id,quantity,status,notes,created_at) VALUES
-                ('Miguel','Manutenção',1,200,'Aprovado','Reposição preventiva',date('now','-2 months')),
-                ('Rita','Produção',2,10,'Pendente','Linha 3',date('now','-1 month')),
-                ('João','Manutenção',3,5,'Entregue','EPI urgente',date('now'))");
+            self::$pdo->exec("INSERT INTO requests (requester,team,item_id,warehouse_id,quantity,status,notes,created_at) VALUES
+                ('Miguel','Manutenção',1,1,200,'Aprovado','Reposição preventiva',date('now','-2 months')),
+                ('Rita','Produção',2,2,10,'Pendente','Linha 3',date('now','-1 month')),
+                ('João','Manutenção',3,1,5,'Entregue','EPI urgente',date('now'))");
         }
     }
 }

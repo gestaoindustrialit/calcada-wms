@@ -5,11 +5,20 @@ spl_autoload_register(function ($class) {
     if (file_exists($path)) require $path;
 });
 
+use App\Core\Auth;
+use App\Core\Url;
 use App\Controllers\AppController;
 
 $controller = new AppController();
 $page = $_GET['page'] ?? 'dashboard';
+$publicRoutes = ['login'];
+if (!in_array($page, $publicRoutes, true) && !Auth::check()) {
+    header('Location: ' . Url::page('login'));
+    exit;
+}
 $routes = [
+    'login'=>fn()=> $controller->login(),
+    'logout'=>fn()=> $controller->logout(),
     'dashboard'=>fn()=> $controller->dashboard(),
     'users'=>fn()=> $controller->users(),
     'warehouses'=>fn()=> $controller->warehouses(),
@@ -18,6 +27,7 @@ $routes = [
     'inventory_save'=>fn()=> $controller->saveInventory(),
     'requests'=>fn()=> $controller->requests(),
     'request_save'=>fn()=> $controller->saveRequest(),
+    'request_action'=>fn()=> $controller->requestAction(),
     'reports'=>fn()=> $controller->reports(),
     'export_excel'=>fn()=> $controller->export('excel'),
     'export_pdf'=>fn()=> $controller->export('pdf'),
