@@ -35,12 +35,14 @@ class Database
         $sql = file_get_contents(dirname(__DIR__, 2) . '/database.sql');
         self::$pdo->exec($sql);
         self::ensureColumn('requests', 'warehouse_id', 'INTEGER');
+        self::ensureColumn('users', 'password_hash', 'TEXT');
+        self::ensureColumn('requests', 'delivered_quantity', 'REAL NOT NULL DEFAULT 0');
         $count = (int) self::$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
         if ($count === 0) {
-            self::$pdo->exec("INSERT INTO users (name,email,role,team) VALUES
-                ('Ana Silva','ana@empresa.local','Chefe','Operações'),
-                ('Bruno Costa','bruno@empresa.local','Compras','Compras'),
-                ('Carla Rocha','carla@empresa.local','Stock','Armazém')");
+            self::$pdo->exec("INSERT INTO users (name,email,role,team,password_hash) VALUES
+                ('Ana Silva','ana@empresa.local','Chefe','Operações','admin123'),
+                ('Bruno Costa','bruno@empresa.local','Compras','Compras','admin123'),
+                ('Carla Rocha','carla@empresa.local','Stock','Armazém','admin123')");
             self::$pdo->exec("INSERT INTO warehouses (name,section,location) VALUES
                 ('Armazém Central','A - Matérias primas','Rua 1, Lisboa'),
                 ('Armazém Norte','B - Consumíveis','Porto'),

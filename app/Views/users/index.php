@@ -1,11 +1,12 @@
 <?php $isEdit = !empty($edit); ?>
-<h1>Utilizadores</h1>
-<form method="post" class="row g-2 quick-form mb-4">
+<div class="page-head"><div><span class="eyebrow">Administração</span><h1>Utilizadores</h1><p>Crie contas com palavra-passe, perfil e equipa para filtrar permissões.</p></div></div>
+<form method="post" class="row g-3 quick-form mb-4" data-smart-form>
     <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>"><?php endif; ?>
-    <div class="col-md-3"><input class="form-control" name="name" placeholder="Nome" value="<?= htmlspecialchars($edit['name'] ?? '') ?>" required></div>
-    <div class="col-md-3"><input class="form-control" name="email" type="email" placeholder="Email" value="<?= htmlspecialchars($edit['email'] ?? '') ?>" required></div>
-    <div class="col-md-2"><input class="form-control" name="role" placeholder="Role" value="<?= htmlspecialchars($edit['role'] ?? '') ?>" required></div>
-    <div class="col-md-2"><input class="form-control" name="team" placeholder="Equipa" value="<?= htmlspecialchars($edit['team'] ?? '') ?>" required></div>
-    <div class="col-md-2"><button class="btn btn-primary w-100"><?= $isEdit ? 'Guardar' : 'Adicionar' ?></button></div>
+    <div class="col-md-3"><label class="form-label">Nome</label><input class="form-control" name="name" placeholder="Nome" value="<?= htmlspecialchars($edit['name'] ?? '') ?>" required></div>
+    <div class="col-md-3"><label class="form-label">Email</label><input class="form-control" name="email" type="email" placeholder="Email" value="<?= htmlspecialchars($edit['email'] ?? '') ?>" required></div>
+    <div class="col-md-2"><label class="form-label">Perfil</label><select class="form-select" name="role" required><?php foreach(['Admin','Chefe','Compras','Stock'] as $role): ?><option <?= ($edit['role'] ?? '')===$role?'selected':'' ?>><?= $role ?></option><?php endforeach; ?></select></div>
+    <div class="col-md-2"><label class="form-label">Equipa</label><input class="form-control" name="team" placeholder="Equipa" value="<?= htmlspecialchars($edit['team'] ?? '') ?>" required></div>
+    <div class="col-md-2"><label class="form-label">Palavra-passe</label><input class="form-control" name="password_hash" type="password" placeholder="<?= $isEdit ? 'Manter atual' : 'Password' ?>" <?= $isEdit ? '' : 'required' ?>></div>
+    <div class="col-12"><button class="btn btn-primary"><?= $isEdit ? 'Guardar utilizador' : 'Adicionar utilizador' ?></button></div>
 </form>
-<div class="table-responsive"><table class="table align-middle"><tr><th>Nome</th><th>Email</th><th>Role</th><th>Equipa</th><th>Ações</th></tr><?php foreach($rows as $r): ?><tr><td><?= htmlspecialchars($r['name']) ?></td><td><?= htmlspecialchars($r['email']) ?></td><td><?= htmlspecialchars($r['role']) ?></td><td><?= htmlspecialchars($r['team']) ?></td><td><a class="btn btn-sm btn-outline-primary" href="<?= \App\Core\Url::page('users') ?>&edit=<?= $r['id'] ?>">Editar</a> <a class="btn btn-sm btn-outline-danger" href="<?= \App\Core\Url::page('users') ?>&delete=<?= $r['id'] ?>" onclick="return confirm('Apagar utilizador?')">Apagar</a></td></tr><?php endforeach; ?></table></div>
+<div class="table-responsive data-shell"><table class="table align-middle"><thead><tr><th>Nome</th><th>Email</th><th>Role</th><th>Equipa</th><th>Ações</th></tr></thead><tbody><?php foreach($rows as $r): ?><tr><td><?= htmlspecialchars($r['name']) ?></td><td><?= htmlspecialchars($r['email']) ?></td><td><span class="pill"><?= htmlspecialchars($r['role']) ?></span></td><td><?= htmlspecialchars($r['team']) ?></td><td><a class="btn btn-sm btn-outline-primary" href="<?= \App\Core\Url::page('users') ?>&edit=<?= $r['id'] ?>">Editar</a> <a class="btn btn-sm btn-outline-danger" href="<?= \App\Core\Url::page('users') ?>&delete=<?= $r['id'] ?>" onclick="return confirm('Apagar utilizador?')">Apagar</a></td></tr><?php endforeach; ?></tbody></table></div>
