@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS requests (
     requester TEXT NOT NULL,
     team TEXT NOT NULL,
     item_id INTEGER NOT NULL,
+    warehouse_id INTEGER,
     quantity REAL NOT NULL,
     status TEXT NOT NULL DEFAULT 'Pendente',
     notes TEXT,

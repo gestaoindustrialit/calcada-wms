@@ -1,40 +1,102 @@
 <?php
 namespace App\Controllers;
 
+use App\Core\Auth;
 use App\Core\Controller;
+use App\Core\Url;
 use App\Models\Repository;
 
 class AppController extends Controller
 {
     private Repository $repo;
     public function __construct(){ $this->repo = new Repository(); }
+    public function login(): void
+    {
+        if (Auth::check()) {
+            $this->redirect(Url::page('dashboard'));
+        }
+        $error = null;
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (Auth::attempt($_POST['username'] ?? '', $_POST['password'] ?? '')) {
+                $this->redirect(Url::page('dashboard'));
+            }
+            $error = 'Credenciais inválidas. Use o utilizador admin configurado para o WMS.';
+        }
+        $this->view('auth/login', ['title'=>'Login admin', 'error'=>$error, 'hideNav'=>true]);
+    }
+    public function logout(): void
+    {
+        Auth::logout();
+        $this->redirect(Url::page('login'));
+    }
     public function dashboard(): void { $this->view('dashboard/index', ['title'=>'Painel', 'stats'=>$this->repo->dashboard(), 'requests'=>$this->repo->requests()]); }
     public function users(): void { $this->crud('users', ['name','email','role','team'], 'users/index', 'Utilizadores'); }
     public function warehouses(): void { $this->crud('warehouses', ['name','section','location'], 'warehouses/index', 'Armazéns'); }
     public function items(): void { $this->crud('items', ['name','designation','unit','weighted_price'], 'items/index', 'Artigos'); }
-    public function inventory(): void { $this->view('inventory/index', ['title'=>'Inventário','rows'=>$this->repo->inventory(),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses()]); }
-    public function requests(): void { $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests(),'items'=>$this->repo->items()]); }
+    public function inventory(): void
+    {
+        if (isset($_GET['delete'])) {
+            $this->repo->delete('inventory', (int)$_GET['delete']);
+            $this->redirect(Url::page('inventory'));
+        }
+        $this->view('inventory/index', ['title'=>'Inventário','rows'=>$this->repo->inventory(),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$this->editRow('inventory')]);
+    }
+    public function requests(): void { $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests(),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses()]); }
     public function reports(): void { $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam()]); }
     private function crud(string $table, array $fields, string $view, string $title): void
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data = array_intersect_key($_POST, array_flip($fields));
-            $this->repo->insert($table, $data);
-            $this->redirect('/?page=' . $table);
+            if (!empty($_POST['id'])) {
+                $this->repo->update($table, (int)$_POST['id'], $data);
+            } else {
+                $this->repo->insert($table, $data);
+            }
+            $this->redirect(Url::page($table));
         }
-        if (isset($_GET['delete'])) { $this->repo->delete($table, (int)$_GET['delete']); $this->redirect('/?page=' . $table); }
-        $this->view($view, ['title'=>$title, 'rows'=>$this->repo->all($table)]);
+        if (isset($_GET['delete'])) { $this->repo->delete($table, (int)$_GET['delete']); $this->redirect(Url::page($table)); }
+        $this->view($view, ['title'=>$title, 'rows'=>$this->repo->all($table), 'edit'=>$this->editRow($table)]);
     }
     public function saveInventory(): void
     {
-        $this->repo->insert('inventory', array_intersect_key($_POST, array_flip(['item_id','warehouse_id','quantity','min_quantity'])));
-        $this->redirect('/?page=inventory');
+        $data = array_intersect_key($_POST, array_flip(['item_id','warehouse_id','quantity','min_quantity']));
+        if (!empty($_POST['id'])) {
+            $this->repo->update('inventory', (int)$_POST['id'], $data);
+        } else {
+            $this->repo->saveInventory($data);
+        }
+        $this->redirect(Url::page('inventory'));
     }
     public function saveRequest(): void
     {
-        $this->repo->insert('requests', array_intersect_key($_POST, array_flip(['requester','team','item_id','quantity','status','notes'])));
-        $this->redirect('/?page=requests');
+        $this->repo->insert('requests', array_intersect_key($_POST, array_flip(['requester','team','item_id','warehouse_id','quantity','status','notes'])));
+        $this->redirect(Url::page('requests'));
     }
+    public function requestAction(): void
+    {
+        $id = (int)($_GET['id'] ?? 0);
+        $action = $_GET['do'] ?? '';
+        $request = $this->repo->find('requests', $id);
+        if ($request) {
+            if ($action === 'approve') {
+                $this->repo->setRequestStatus($id, 'Aprovado');
+            } elseif ($action === 'deliver') {
+                $this->repo->setRequestStatus($id, 'Entregue');
+                if (!empty($request['warehouse_id'])) {
+                    $this->repo->adjustInventory((int)$request['item_id'], (int)$request['warehouse_id'], -(float)$request['quantity']);
+                }
+            } elseif ($action === 'cancel') {
+                $this->repo->setRequestStatus($id, 'Cancelado');
+            }
+        }
+        $this->redirect(Url::page('requests'));
+    }
+
+    private function editRow(string $table): ?array
+    {
+        return isset($_GET['edit']) ? $this->repo->find($table, (int)$_GET['edit']) : null;
+    }
+
     public function export(string $type): void
     {
         $rows = $this->repo->inventory();
