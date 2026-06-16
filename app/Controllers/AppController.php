@@ -52,8 +52,10 @@ class AppController extends Controller
     {
         $this->ensureChiefAllowed();
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['items_csv'])) {
-            $result = $this->repo->importItems($_FILES['items_csv']);
-            $_SESSION['flash'] = 'Importação: ' . $result['created'] . ' criados, ' . $result['updated'] . ' atualizados' . ($result['errors'] ? ' — ' . implode(' ', $result['errors']) : '.');
+            $mode = $_POST['import_mode'] ?? 'quick';
+            $result = $this->repo->importItems($_FILES['items_csv'], $mode === 'located');
+            $extra = $mode === 'located' ? ', ' . $result['stocked'] . ' linhas de stock/localização' : '';
+            $_SESSION['flash'] = 'Importação: ' . $result['created'] . ' criados, ' . $result['updated'] . ' atualizados' . $extra . ($result['errors'] ? ' — ' . implode(' ', $result['errors']) : '.');
             $this->redirect(Url::page('items'));
         }
         $this->crud('items', ['name','designation','unit','weighted_price'], 'items/index', 'Artigos');

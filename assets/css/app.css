@@ -209,3 +209,25 @@ main.container-fluid { max-width: 1640px; padding-inline: 1.4rem; }
 .request-line__actions { display: flex; justify-content: flex-end; margin-top: -.35rem; }
 .request-form-actions { display: flex; align-items: center; gap: .6rem; margin-top: 1rem; }
 .request-form-actions .btn-light { color: #3730a3; }
+
+.import-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.import-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.import-card h5 { margin: 0; font-weight: 900; }
+.import-card p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.import-card code { white-space: normal; overflow-wrap: anywhere; font-weight: 850; color: var(--ink); }
+.import-card .form-control { width: 100%; min-width: 0; }
+.import-card__content { display: grid; gap: .65rem; min-width: 0; }
+.import-card__template { width: fit-content; max-width: 100%; }
+
+@media (max-width: 1200px) { .import-grid { grid-template-columns: 1fr; } }
