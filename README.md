@@ -4,12 +4,12 @@ Aplicação PHP MVC sem framework para gestão de armazém, com Bootstrap, JavaS
 
 ## Funcionalidades
 
-- Gestão de utilizadores, roles e equipas.
+- Gestão de utilizadores, roles, equipas e palavra-passe de acesso.
 - Gestão de armazéns, secções e localizações.
-- Gestão de artigos com unidade e preço ponderado.
+- Gestão de artigos com unidade, preço ponderado e importação bulk por CSV exportado do SAGE.
 - Inventário com alertas de mínimo e exportação CSV/Excel e PDF.
-- Requisição rápida a armazém para comunicação entre chefes de equipa e compras/stock.
-- Gráficos mensais do valor dos pedidos por equipa.
+- Requisição rápida a armazém com pesquisa de artigos, edição de pedidos e entregas parciais com abatimento de stock.
+- Gráficos mensais do valor dos pedidos por equipa e dashboard dos chefes filtrada às suas requisições com gastos semanais, mensais e anuais.
 
 ## Instalar
 
