@@ -64,7 +64,16 @@ class AppController extends Controller
         }
         $this->view('inventory/index', ['title'=>'Inventário','rows'=>$this->repo->inventory(),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$this->editRow('inventory')]);
     }
-    public function requests(): void { $user = Auth::user(); $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$this->editRow('requests'), 'currentUser'=>$user]); }
+    public function requests(): void
+    {
+        $user = Auth::user();
+        $canManageRequests = $this->canManageRequests($user);
+        $edit = $this->editRow('requests');
+        if ($edit && !$canManageRequests) {
+            $this->redirect(Url::page('requests'));
+        }
+        $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$edit, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests]);
+    }
     public function reports(): void { $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam()]); }
     private function crud(string $table, array $fields, string $view, string $title): void
     {
@@ -96,8 +105,34 @@ class AppController extends Controller
     }
     public function saveRequest(): void
     {
-        $data = array_intersect_key($_POST, array_flip(['requester','team','item_id','warehouse_id','quantity','status','notes']));
-        if (!empty($_POST['id'])) { $this->repo->update('requests', (int)$_POST['id'], $data); } else { $this->repo->insert('requests', $data); }
+        $user = Auth::user();
+        $canManageRequests = $this->canManageRequests($user);
+        $requester = $canManageRequests ? trim((string)($_POST['requester'] ?? '')) : ($user['name'] ?? '');
+        $team = $canManageRequests ? trim((string)($_POST['team'] ?? '')) : ($user['team'] ?? '');
+        $status = $canManageRequests ? ($_POST['status'] ?? 'Pendente') : 'Pendente';
+
+        if (!empty($_POST['id'])) {
+            if (!$canManageRequests) {
+                $this->redirect(Url::page('requests'));
+            }
+            $line = $_POST['items'][0] ?? $_POST;
+            $data = array_intersect_key($line, array_flip(['item_id','warehouse_id','quantity','notes']));
+            $data['requester'] = $requester;
+            $data['team'] = $team;
+            $data['status'] = $status;
+            $this->repo->update('requests', (int)$_POST['id'], $data);
+        } else {
+            foreach (($_POST['items'] ?? []) as $line) {
+                if (empty($line['item_id']) || empty($line['quantity'])) {
+                    continue;
+                }
+                $data = array_intersect_key($line, array_flip(['item_id','warehouse_id','quantity','notes']));
+                $data['requester'] = $requester;
+                $data['team'] = $team;
+                $data['status'] = $status;
+                $this->repo->insert('requests', $data);
+            }
+        }
         $this->redirect(Url::page('requests'));
     }
     public function requestAction(): void
@@ -106,6 +141,10 @@ class AppController extends Controller
         $action = $_GET['do'] ?? '';
         $request = $this->repo->find('requests', $id);
         if ($request) {
+            $user = Auth::user();
+            if (!$this->canManageRequests($user)) {
+                $this->redirect(Url::page('requests'));
+            }
             if ($action === 'approve') {
                 $this->repo->setRequestStatus($id, 'Aprovado');
             } elseif ($action === 'deliver') {
@@ -116,6 +155,12 @@ class AppController extends Controller
             }
         }
         $this->redirect(Url::page('requests'));
+    }
+
+    private function canManageRequests(?array $user = null): bool
+    {
+        $role = strtolower((string)($user['role'] ?? ''));
+        return in_array($role, ['admin', 'compras'], true);
     }
 
     private function editRow(string $table): ?array

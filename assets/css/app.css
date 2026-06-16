@@ -203,3 +203,9 @@ main.container-fluid { max-width: 1640px; padding-inline: 1.4rem; }
 
 @media (max-width: 992px) { .grid-two { grid-template-columns: 1fr; } .page-hero, .page-head { padding: 1.1rem; } }
 @media (max-width: 768px) { main.container-fluid { padding-inline: .8rem; } .page-card { padding: .75rem; border-radius: 20px; } .modern-table, .table { font-size: .875rem; } .btn-cluster { display: grid; grid-template-columns: repeat(4, auto); } .delivery-summary { grid-template-columns: 1fr; } .chart-panel { height: 320px; } }
+
+.request-lines { display: grid; gap: .85rem; }
+.request-line { position: relative; padding: .85rem; border: 1px solid rgba(226, 232, 240, .9); border-radius: 18px; background: rgba(248, 250, 252, .72); }
+.request-line__actions { display: flex; justify-content: flex-end; margin-top: -.35rem; }
+.request-form-actions { display: flex; align-items: center; gap: .6rem; margin-top: 1rem; }
+.request-form-actions .btn-light { color: #3730a3; }

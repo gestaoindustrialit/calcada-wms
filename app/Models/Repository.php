@@ -96,9 +96,9 @@ class Repository extends Model
     {
         $where = '';
         $params = [];
-        if ($user && ($user['role'] ?? '') === 'Chefe') {
-            $where = 'WHERE requests.team = :team OR requests.requester = :name';
-            $params = ['team'=>$user['team'] ?? '', 'name'=>$user['name'] ?? ''];
+        if ($user && !in_array(strtolower((string)($user['role'] ?? '')), ['admin', 'compras'], true)) {
+            $where = 'WHERE requests.requester = :name';
+            $params = ['name'=>$user['name'] ?? ''];
         }
         $stmt = $this->db->prepare("SELECT requests.*, items.name AS item, items.weighted_price, warehouses.name AS warehouse,
             (requests.quantity * items.weighted_price) AS request_value,
