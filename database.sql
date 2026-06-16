@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL,
     role TEXT NOT NULL,
     team TEXT NOT NULL DEFAULT 'Geral',
+    password_hash TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS warehouses (
@@ -12,6 +13,16 @@ CREATE TABLE IF NOT EXISTS warehouses (
     section TEXT NOT NULL,
     location TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS warehouse_locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    warehouse_id INTEGER NOT NULL,
+    type TEXT NOT NULL DEFAULT 'Setor',
+    code TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(warehouse_id) REFERENCES warehouses(id)
 );
 CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,6 +47,7 @@ CREATE TABLE IF NOT EXISTS requests (
     item_id INTEGER NOT NULL,
     warehouse_id INTEGER,
     quantity REAL NOT NULL,
+    delivered_quantity REAL NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'Pendente',
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
