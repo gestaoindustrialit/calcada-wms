@@ -155,8 +155,8 @@ class Repository extends Model
 
     public function spendingByPeriod(?array $user = null): array
     {
-        $filter = $user && ($user['role'] ?? '') === 'Chefe' ? 'AND (requests.team = :team OR requests.requester = :name)' : '';
-        $params = $filter ? ['team'=>$user['team'] ?? '', 'name'=>$user['name'] ?? ''] : [];
+        $filter = $this->isChief($user) ? 'AND requests.requester = :name' : '';
+        $params = $filter ? ['name'=>$user['name'] ?? ''] : [];
         $sql = "SELECT
             COALESCE(SUM(CASE WHEN date(requests.created_at) >= date('now','-6 days') THEN requests.quantity*items.weighted_price END),0) week,
             COALESCE(SUM(CASE WHEN strftime('%Y-%m',requests.created_at)=strftime('%Y-%m','now') THEN requests.quantity*items.weighted_price END),0) month,
@@ -167,23 +167,32 @@ class Repository extends Model
 
     public function articleSpend(?array $user = null): array
     {
-        $filter = $user && ($user['role'] ?? '') === 'Chefe' ? 'WHERE requests.team = :team OR requests.requester = :name' : '';
+        $filter = $this->isChief($user) ? 'WHERE requests.requester = :name' : '';
         $stmt = $this->db->prepare("SELECT items.name item, ROUND(SUM(requests.quantity*items.weighted_price),2) total FROM requests JOIN items ON items.id=requests.item_id {$filter} GROUP BY items.id ORDER BY total DESC LIMIT 8");
-        $stmt->execute($filter ? ['team'=>$user['team'] ?? '', 'name'=>$user['name'] ?? ''] : []); return $stmt->fetchAll();
+        $stmt->execute($filter ? ['name'=>$user['name'] ?? ''] : []); return $stmt->fetchAll();
     }
 
 
-    public function monthlyByTeam(): array
+    public function monthlyByTeam(?array $user = null): array
     {
-        return $this->db->query("SELECT strftime('%Y-%m', requests.created_at) AS month, requests.team,
+        $filter = $this->isChief($user) ? 'WHERE requests.requester = :name' : '';
+        $stmt = $this->db->prepare("SELECT strftime('%Y-%m', requests.created_at) AS month, requests.team,
             ROUND(SUM(requests.quantity * items.weighted_price),2) AS total
             FROM requests JOIN items ON items.id=requests.item_id
-            GROUP BY month, requests.team ORDER BY month ASC")->fetchAll();
+            {$filter}
+            GROUP BY month, requests.team ORDER BY month ASC");
+        $stmt->execute($filter ? ['name'=>$user['name'] ?? ''] : []);
+        return $stmt->fetchAll();
     }
 
     public function dashboard(?array $user = null): array
     {
         return ['users'=>(int)$this->db->query('SELECT COUNT(*) FROM users')->fetchColumn(),'warehouses'=>(int)$this->db->query('SELECT COUNT(*) FROM warehouses')->fetchColumn(),'items'=>(int)$this->db->query('SELECT COUNT(*) FROM items')->fetchColumn(),'stock_value'=>(float)$this->db->query('SELECT COALESCE(SUM(inventory.quantity*items.weighted_price),0) FROM inventory JOIN items ON items.id=inventory.item_id')->fetchColumn(),'spending'=>$this->spendingByPeriod($user),'article_spend'=>$this->articleSpend($user)];
+    }
+
+    private function isChief(?array $user = null): bool
+    {
+        return strtolower((string)($user['role'] ?? '')) === 'chefe';
     }
 
     private function guardTable(string $table): void
