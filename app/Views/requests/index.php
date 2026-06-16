@@ -9,6 +9,6 @@
     <div class="col-md-1"><input class="form-control" name="quantity" type="number" step="0.01" placeholder="Qtd" value="<?= htmlspecialchars($edit['quantity'] ?? '') ?>" required></div>
     <div class="col-md-2"><input class="form-control" name="notes" placeholder="Notas / obra / centro custo" value="<?= htmlspecialchars($edit['notes'] ?? '') ?>"></div>
     <input type="hidden" name="status" value="<?= htmlspecialchars($edit['status'] ?? 'Pendente') ?>">
-    <div class="col-12"><button class="btn btn-primary"><?= $isEdit ? 'Guardar pedido' : 'Pedir artigos' ?></button></div>
+    <div class="col-12"><button class="btn btn-primary" title="Guardar pedido" aria-label="Guardar pedido"><i class="bi bi-send"></i></button></div>
 </form>
 <?php require dirname(__DIR__).'/partials/requests_table.php'; ?>
