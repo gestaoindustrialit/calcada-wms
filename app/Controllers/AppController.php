@@ -30,9 +30,10 @@ class AppController extends Controller
         $this->redirect(Url::page('login'));
     }
     public function dashboard(): void { $user = Auth::user(); $this->view('dashboard/index', ['title'=>'Painel', 'stats'=>$this->repo->dashboard($user), 'requests'=>$this->repo->requests($user), 'currentUser'=>$user]); }
-    public function users(): void { $this->crud('users', ['name','email','role','team','password_hash'], 'users/index', 'Utilizadores'); }
+    public function users(): void { $this->ensureChiefAllowed(); $this->crud('users', ['name','email','role','team','password_hash'], 'users/index', 'Utilizadores'); }
     public function warehouses(): void
     {
+        $this->ensureChiefAllowed();
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_type'] ?? '') === 'location') {
             $data = array_intersect_key($_POST, array_flip(['warehouse_id','type','code','description']));
             if (!empty($_POST['id'])) { $this->repo->update('warehouse_locations', (int)$_POST['id'], $data); } else { $this->repo->insert('warehouse_locations', $data); }
@@ -49,6 +50,7 @@ class AppController extends Controller
     }
     public function items(): void
     {
+        $this->ensureChiefAllowed();
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['items_csv'])) {
             $result = $this->repo->importItems($_FILES['items_csv']);
             $_SESSION['flash'] = 'Importação: ' . $result['created'] . ' criados, ' . $result['updated'] . ' atualizados' . ($result['errors'] ? ' — ' . implode(' ', $result['errors']) : '.');
@@ -58,6 +60,7 @@ class AppController extends Controller
     }
     public function inventory(): void
     {
+        $this->ensureChiefAllowed();
         if (isset($_GET['delete'])) {
             $this->repo->delete('inventory', (int)$_GET['delete']);
             $this->redirect(Url::page('inventory'));
@@ -74,7 +77,7 @@ class AppController extends Controller
         }
         $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$edit, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests]);
     }
-    public function reports(): void { $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam()]); }
+    public function reports(): void { $user = Auth::user(); $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam($user), 'currentUser'=>$user]); }
     private function crud(string $table, array $fields, string $view, string $title): void
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -95,6 +98,7 @@ class AppController extends Controller
     }
     public function saveInventory(): void
     {
+        $this->ensureChiefAllowed();
         $data = array_intersect_key($_POST, array_flip(['item_id','warehouse_id','quantity','min_quantity']));
         if (!empty($_POST['id'])) {
             $this->repo->update('inventory', (int)$_POST['id'], $data);
@@ -163,6 +167,13 @@ class AppController extends Controller
         return in_array($role, ['admin', 'compras'], true);
     }
 
+    private function ensureChiefAllowed(): void
+    {
+        if (strtolower((string)(Auth::user()['role'] ?? '')) === 'chefe') {
+            $this->redirect(Url::page('requests'));
+        }
+    }
+
     private function editRow(string $table): ?array
     {
         return isset($_GET['edit']) ? $this->repo->find($table, (int)$_GET['edit']) : null;
@@ -170,6 +181,7 @@ class AppController extends Controller
 
     public function export(string $type): void
     {
+        $this->ensureChiefAllowed();
         $rows = $this->repo->inventory();
         if ($type === 'excel') {
             header('Content-Type: text/csv; charset=utf-8'); header('Content-Disposition: attachment; filename=inventario.csv');
