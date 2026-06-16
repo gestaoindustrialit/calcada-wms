@@ -6,7 +6,7 @@ use App\Core\Model;
 
 class Repository extends Model
 {
-    private array $allowedTables = ['users','warehouses','items','inventory','requests'];
+    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests'];
 
     public function all(string $table): array
     {
@@ -56,6 +56,14 @@ class Repository extends Model
 
     public function items(): array { return $this->all('items'); }
     public function warehouses(): array { return $this->all('warehouses'); }
+
+    public function warehouseLocations(?int $warehouseId = null): array
+    {
+        $where = $warehouseId ? 'WHERE warehouse_locations.warehouse_id = :warehouse_id' : '';
+        $stmt = $this->db->prepare("SELECT warehouse_locations.*, warehouses.name AS warehouse FROM warehouse_locations JOIN warehouses ON warehouses.id = warehouse_locations.warehouse_id {$where} ORDER BY warehouses.name, warehouse_locations.type, warehouse_locations.code");
+        $stmt->execute($warehouseId ? ['warehouse_id'=>$warehouseId] : []);
+        return $stmt->fetchAll();
+    }
 
     public function saveInventory(array $data): void
     {

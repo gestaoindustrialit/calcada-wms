@@ -37,6 +37,10 @@ class Database
         self::ensureColumn('requests', 'warehouse_id', 'INTEGER');
         self::ensureColumn('users', 'password_hash', 'TEXT');
         self::ensureColumn('requests', 'delivered_quantity', 'REAL NOT NULL DEFAULT 0');
+        self::$pdo->exec("CREATE TABLE IF NOT EXISTS warehouse_locations (id INTEGER PRIMARY KEY AUTOINCREMENT, warehouse_id INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'Setor', code TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(warehouse_id) REFERENCES warehouses(id))");
+        if ((int) self::$pdo->query('SELECT COUNT(*) FROM warehouse_locations')->fetchColumn() === 0 && (int) self::$pdo->query('SELECT COUNT(*) FROM warehouses')->fetchColumn() > 0) {
+            self::$pdo->exec("INSERT INTO warehouse_locations (warehouse_id,type,code,description) SELECT id,'Setor',section,location FROM warehouses");
+        }
         $count = (int) self::$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
         if ($count === 0) {
             self::$pdo->exec("INSERT INTO users (name,email,role,team,password_hash) VALUES
@@ -47,6 +51,8 @@ class Database
                 ('Armazém Central','A - Matérias primas','Rua 1, Lisboa'),
                 ('Armazém Norte','B - Consumíveis','Porto'),
                 ('Armazém Sul','C - Expedição','Faro')");
+            self::$pdo->exec("INSERT INTO warehouse_locations (warehouse_id,type,code,description) VALUES
+                (1,'Setor','A','Matérias primas'),(1,'Posição','A-01','Parafusaria'),(2,'Setor','B','Consumíveis'),(3,'Posição','C-EXP','Expedição')");
             self::$pdo->exec("INSERT INTO items (name,designation,unit,weighted_price) VALUES
                 ('Parafuso M8','Fixação zincada','un',0.18),
                 ('Tinta branca','Balde 15L','lt',4.75),

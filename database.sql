@@ -14,6 +14,16 @@ CREATE TABLE IF NOT EXISTS warehouses (
     location TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS warehouse_locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    warehouse_id INTEGER NOT NULL,
+    type TEXT NOT NULL DEFAULT 'Setor',
+    code TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(warehouse_id) REFERENCES warehouses(id)
+);
 CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,

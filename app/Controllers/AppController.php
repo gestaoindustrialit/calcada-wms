@@ -31,7 +31,22 @@ class AppController extends Controller
     }
     public function dashboard(): void { $user = Auth::user(); $this->view('dashboard/index', ['title'=>'Painel', 'stats'=>$this->repo->dashboard($user), 'requests'=>$this->repo->requests($user), 'currentUser'=>$user]); }
     public function users(): void { $this->crud('users', ['name','email','role','team','password_hash'], 'users/index', 'Utilizadores'); }
-    public function warehouses(): void { $this->crud('warehouses', ['name','section','location'], 'warehouses/index', 'Armazéns'); }
+    public function warehouses(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_type'] ?? '') === 'location') {
+            $data = array_intersect_key($_POST, array_flip(['warehouse_id','type','code','description']));
+            if (!empty($_POST['id'])) { $this->repo->update('warehouse_locations', (int)$_POST['id'], $data); } else { $this->repo->insert('warehouse_locations', $data); }
+            $this->redirect(Url::page('warehouses'));
+        }
+        if (isset($_GET['delete_location'])) { $this->repo->delete('warehouse_locations', (int)$_GET['delete_location']); $this->redirect(Url::page('warehouses')); }
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $data = array_intersect_key($_POST, array_flip(['name','section','location']));
+            if (!empty($_POST['id'])) { $this->repo->update('warehouses', (int)$_POST['id'], $data); } else { $this->repo->insert('warehouses', $data); }
+            $this->redirect(Url::page('warehouses'));
+        }
+        if (isset($_GET['delete'])) { $this->repo->delete('warehouses', (int)$_GET['delete']); $this->redirect(Url::page('warehouses')); }
+        $this->view('warehouses/index', ['title'=>'Armazéns', 'rows'=>$this->repo->all('warehouses'), 'locations'=>$this->repo->warehouseLocations(), 'edit'=>$this->editRow('warehouses'), 'editLocation'=>isset($_GET['edit_location']) ? $this->repo->find('warehouse_locations', (int)$_GET['edit_location']) : null]);
+    }
     public function items(): void
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['items_csv'])) {
