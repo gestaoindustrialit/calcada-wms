@@ -30,12 +30,12 @@ $articleRows = $isEdit ? [[
     </div>
     <div class="request-lines" data-request-lines>
         <?php foreach ($articleRows as $index => $line): ?>
-            <div class="row g-3 request-line" data-request-line>
-                <div class="col-md-4"><select class="form-select searchable-select" name="items[<?= $index ?>][item_id]" aria-label="Artigo"><?php foreach($items as $i): ?><option value="<?= $i['id'] ?>" <?= (int)($line['item_id'] ?? 0)===(int)$i['id']?'selected':'' ?>><?= htmlspecialchars($i['name'].' — '.$i['designation']) ?></option><?php endforeach; ?></select></div>
-                <div class="col-md-3"><select class="form-select" name="items[<?= $index ?>][warehouse_id]" aria-label="Armazém"><?php foreach($warehouses as $w): ?><option value="<?= $w['id'] ?>" <?= (int)($line['warehouse_id'] ?? 0)===(int)$w['id']?'selected':'' ?>><?= htmlspecialchars($w['name'].' · '.$w['section']) ?></option><?php endforeach; ?></select></div>
-                <div class="col-md-2"><input class="form-control" name="items[<?= $index ?>][quantity]" type="number" min="0.01" step="0.01" placeholder="Qtd" value="<?= htmlspecialchars($line['quantity'] ?? '') ?>" required></div>
-                <div class="col-md-3"><input class="form-control" name="items[<?= $index ?>][notes]" placeholder="Notas / obra / centro custo" value="<?= htmlspecialchars($line['notes'] ?? '') ?>"></div>
-                <div class="col-12 request-line__actions"><button type="button" class="btn btn-outline-danger btn-sm" data-remove-request-line title="Remover linha" aria-label="Remover linha" <?= $isEdit ? 'disabled' : '' ?>><i class="bi bi-dash-lg"></i></button></div>
+            <div class="request-line" data-request-line>
+                <div class="request-line__field request-line__article"><select class="form-select searchable-select" name="items[<?= $index ?>][item_id]" aria-label="Artigo"><?php foreach($items as $i): ?><option value="<?= $i['id'] ?>" <?= (int)($line['item_id'] ?? 0)===(int)$i['id']?'selected':'' ?>><?= htmlspecialchars($i['name'].' — '.$i['designation']) ?></option><?php endforeach; ?></select></div>
+                <div class="request-line__field request-line__warehouse"><select class="form-select" name="items[<?= $index ?>][warehouse_id]" aria-label="Armazém"><?php foreach($warehouses as $w): ?><option value="<?= $w['id'] ?>" <?= (int)($line['warehouse_id'] ?? 0)===(int)$w['id']?'selected':'' ?>><?= htmlspecialchars($w['name'].' · '.$w['section']) ?></option><?php endforeach; ?></select></div>
+                <div class="request-line__field request-line__quantity"><input class="form-control" name="items[<?= $index ?>][quantity]" type="number" min="0.01" step="0.01" placeholder="Qtd" value="<?= htmlspecialchars($line['quantity'] ?? '') ?>" required></div>
+                <div class="request-line__field request-line__notes"><input class="form-control" name="items[<?= $index ?>][notes]" placeholder="Notas / obra / centro custo" value="<?= htmlspecialchars($line['notes'] ?? '') ?>"></div>
+                <div class="request-line__remove"><button type="button" class="btn btn-outline-danger btn-sm" data-remove-request-line title="Remover linha" aria-label="Remover linha" <?= $isEdit ? 'disabled' : '' ?>><i class="bi bi-dash-lg"></i></button></div>
             </div>
         <?php endforeach; ?>
     </div>
