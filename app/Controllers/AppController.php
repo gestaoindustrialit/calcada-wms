@@ -67,7 +67,9 @@ class AppController extends Controller
             $this->repo->delete('inventory', (int)$_GET['delete']);
             $this->redirect(Url::page('inventory'));
         }
-        $this->view('inventory/index', ['title'=>'Inventário','rows'=>$this->repo->inventory(),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$this->editRow('inventory')]);
+        $filters = array_intersect_key($_GET, array_flip(['q','item_id','warehouse_id','stock_status']));
+        $rows = $this->repo->inventory($filters);
+        $this->view('inventory/index', ['title'=>'Inventário','rows'=>$rows,'summary'=>$this->repo->inventorySummary($rows),'filters'=>$filters,'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$this->editRow('inventory')]);
     }
     public function requests(): void
     {
@@ -103,9 +105,9 @@ class AppController extends Controller
         $this->ensureChiefAllowed();
         $data = array_intersect_key($_POST, array_flip(['item_id','warehouse_id','quantity','min_quantity']));
         if (!empty($_POST['id'])) {
-            $this->repo->update('inventory', (int)$_POST['id'], $data);
+            $this->repo->saveInventory($data, 'set');
         } else {
-            $this->repo->saveInventory($data);
+            $this->repo->saveInventory($data, $_POST['movement_type'] ?? 'in');
         }
         $this->redirect(Url::page('inventory'));
     }
@@ -184,14 +186,35 @@ class AppController extends Controller
     public function export(string $type): void
     {
         $this->ensureChiefAllowed();
-        $rows = $this->repo->inventory();
+        $filters = array_intersect_key($_GET, array_flip(['q','item_id','warehouse_id','stock_status']));
+        $rows = $this->repo->inventory($filters);
         if ($type === 'excel') {
             header('Content-Type: text/csv; charset=utf-8'); header('Content-Disposition: attachment; filename=inventario.csv');
             $out = fopen('php://output','w'); fputcsv($out, ['Artigo','Armazém','Qtd','Unidade','P. Ponderado','Valor']);
             foreach($rows as $r){ fputcsv($out, [$r['item'],$r['warehouse'],$r['quantity'],$r['unit'],$r['weighted_price'],$r['stock_value']]); } exit;
         }
         header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename=inventario.pdf');
-        $text = "Inventario\n" . implode("\n", array_map(fn($r)=>$r['item'].' - '.$r['warehouse'].' - '.$r['quantity'].' '.$r['unit'].' - EUR '.number_format((float)$r['stock_value'],2), $rows));
-        echo "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>>>>>endobj\n4 0 obj<</Length ".(strlen($text)+60).">>stream\nBT /F1 12 Tf 50 750 Td (".str_replace(['(',')',"\n"], ['[',']',') Tj T* ('], $text).") Tj ET\nendstream endobj\nxref\n0 5\n0000000000 65535 f \ntrailer<</Root 1 0 R/Size 5>>\n%%EOF"; exit;
+        $escape = fn($value) => str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], (string)$value);
+        $lines = ['Inventário', 'Artigo - Armazém - Quantidade - Valor'];
+        foreach ($rows as $r) {
+            $lines[] = $r['item'].' - '.$r['warehouse'].' - '.$r['quantity'].' '.$r['unit'].' - EUR '.number_format((float)$r['stock_value'], 2, ',', '.');
+        }
+        $content = "BT /F1 11 Tf 50 760 Td 16 TL";
+        foreach ($lines as $index => $line) {
+            $content .= ($index === 0 ? ' ' : ' T* ') . '(' . $escape($line) . ') Tj';
+        }
+        $content .= ' ET';
+        echo "%PDF-1.4
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>>>>>endobj
+4 0 obj<</Length ".strlen($content).">>stream
+".$content."
+endstream endobj
+xref
+0 5
+0000000000 65535 f
+trailer<</Root 1 0 R/Size 5>>
+%%EOF"; exit;
     }
 }
