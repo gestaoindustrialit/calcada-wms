@@ -221,16 +221,25 @@ main.container-fluid { max-width: 1640px; padding-inline: 1.4rem; }
 .request-form-actions { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; }
 .request-form-actions .btn { width: 42px; min-width: 42px; height: 42px; padding: 0; }
 .request-form-actions .btn-light { color: #3730a3; }
-@media (max-width: 1200px) {
-  .request-line { grid-template-columns: repeat(2, minmax(0, 1fr)) 44px; }
-  .request-line__article,
-  .request-line__notes { grid-column: span 2; }
-  .request-line__remove { grid-column: 3; grid-row: 1; }
+
+.import-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
 }
-@media (max-width: 768px) {
-  .request-line { grid-template-columns: 1fr; }
-  .request-line__article,
-  .request-line__notes,
-  .request-line__remove { grid-column: auto; grid-row: auto; }
-  .request-line__remove { justify-content: flex-start; }
+
+.import-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
 }
+
+.import-card h5 { margin: 0; font-weight: 900; }
+.import-card p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.import-card code { white-space: normal; overflow-wrap: anywhere; font-weight: 850; color: var(--ink); }
+.import-card .form-control { width: 100%; min-width: 0; }
+.import-card__content { display: grid; gap: .65rem; min-width: 0; }
+.import-card__template { width: fit-content; max-width: 100%; }
+
+@media (max-width: 1200px) { .import-grid { grid-template-columns: 1fr; } }
