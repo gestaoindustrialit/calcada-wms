@@ -7,7 +7,22 @@ $exportSuffix = $filterQuery ? '&' . $filterQuery : '';
 ?>
 <div class="page-head"><div><span class="eyebrow">Stock em tempo real</span><h1>Inventário</h1><p>Filtre por artigo, armazém ou estado de stock e registe movimentos de entrada ou saída.</p></div></div>
 <div class="btn-group-responsive mb-3"><a class="btn btn-success" href="<?= \App\Core\Url::page('export_excel') . $exportSuffix ?>" title="Export Excel/CSV" aria-label="Export Excel/CSV"><i class="bi bi-file-earmark-spreadsheet"></i></a><a class="btn btn-danger" href="<?= \App\Core\Url::page('export_pdf') . $exportSuffix ?>" title="Export PDF" aria-label="Export PDF"><i class="bi bi-file-earmark-pdf"></i></a></div>
+<form method="post" action="<?= \App\Core\Url::page('inventory_save') ?>" class="row g-2 quick-form mb-4">
+    <div class="section-title"><h2><?= $isEdit ? 'Atualizar stock' : 'Registar movimento' ?></h2><span class="soft-badge"><i class="bi bi-arrow-down-up"></i> Entrada/Saída</span></div>
+    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>"><?php endif; ?>
+    <div class="col-md-3"><select class="form-select" name="item_id"><?php foreach($items as $i): ?><option value="<?= $i['id'] ?>" <?= (int)($edit['item_id'] ?? 0) === (int)$i['id'] ? 'selected' : '' ?>><?= htmlspecialchars($i['name']) ?></option><?php endforeach; ?></select></div>
+    <div class="col-md-3"><select class="form-select" name="warehouse_id"><?php foreach($warehouses as $w): ?><option value="<?= $w['id'] ?>" <?= (int)($edit['warehouse_id'] ?? 0) === (int)$w['id'] ? 'selected' : '' ?>><?= htmlspecialchars($w['name'].' · '.$w['section']) ?></option><?php endforeach; ?></select></div>
+    <?php if (!$isEdit): ?><div class="col-md-2"><select class="form-select" name="movement_type"><option value="in">Entrada (+)</option><option value="out">Saída (-)</option></select></div><?php endif; ?>
+    <div class="col-md-2"><input class="form-control" name="quantity" type="number" min="0" step="0.01" placeholder="<?= $isEdit ? 'Stock final' : 'Quantidade' ?>" value="<?= htmlspecialchars($edit['quantity'] ?? '') ?>" required></div>
+    <div class="col-md-1"><input class="form-control" name="min_quantity" type="number" min="0" step="0.01" placeholder="Mín." value="<?= htmlspecialchars($edit['min_quantity'] ?? '') ?>" required></div>
+    <div class="col-md-1"><button class="btn btn-primary w-100" title="Guardar stock" aria-label="Guardar stock"><i class="bi bi-save"></i></button></div>
+</form>
 
+<div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="inventory-stat"><small>Linhas filtradas</small><strong><?= (int)$summary['lines'] ?></strong></div></div>
+    <div class="col-md-4"><div class="inventory-stat"><small>Quantidade total</small><strong><?= number_format((float)$summary['quantity'], 2, ',', '.') ?></strong></div></div>
+    <div class="col-md-4"><div class="inventory-stat"><small>Valor filtrado</small><strong>€ <?= number_format((float)$summary['value'], 2, ',', '.') ?></strong></div></div>
+</div>
 <form method="get" class="quick-form mb-4">
     <input type="hidden" name="page" value="inventory">
     <div class="section-title"><h2>Filtrar inventário</h2><span class="soft-badge"><i class="bi bi-funnel"></i> <?= (int)$summary['lines'] ?> linhas</span></div>
@@ -20,22 +35,7 @@ $exportSuffix = $filterQuery ? '&' . $filterQuery : '';
     </div>
 </form>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-4"><div class="inventory-stat"><small>Linhas filtradas</small><strong><?= (int)$summary['lines'] ?></strong></div></div>
-    <div class="col-md-4"><div class="inventory-stat"><small>Quantidade total</small><strong><?= number_format((float)$summary['quantity'], 2, ',', '.') ?></strong></div></div>
-    <div class="col-md-4"><div class="inventory-stat"><small>Valor filtrado</small><strong>€ <?= number_format((float)$summary['value'], 2, ',', '.') ?></strong></div></div>
-</div>
 
-<form method="post" action="<?= \App\Core\Url::page('inventory_save') ?>" class="row g-2 quick-form mb-4">
-    <div class="section-title"><h2><?= $isEdit ? 'Atualizar stock' : 'Registar movimento' ?></h2><span class="soft-badge"><i class="bi bi-arrow-down-up"></i> Entrada/Saída</span></div>
-    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>"><?php endif; ?>
-    <div class="col-md-3"><select class="form-select" name="item_id"><?php foreach($items as $i): ?><option value="<?= $i['id'] ?>" <?= (int)($edit['item_id'] ?? 0) === (int)$i['id'] ? 'selected' : '' ?>><?= htmlspecialchars($i['name']) ?></option><?php endforeach; ?></select></div>
-    <div class="col-md-3"><select class="form-select" name="warehouse_id"><?php foreach($warehouses as $w): ?><option value="<?= $w['id'] ?>" <?= (int)($edit['warehouse_id'] ?? 0) === (int)$w['id'] ? 'selected' : '' ?>><?= htmlspecialchars($w['name'].' · '.$w['section']) ?></option><?php endforeach; ?></select></div>
-    <?php if (!$isEdit): ?><div class="col-md-2"><select class="form-select" name="movement_type"><option value="in">Entrada (+)</option><option value="out">Saída (-)</option></select></div><?php endif; ?>
-    <div class="col-md-2"><input class="form-control" name="quantity" type="number" min="0" step="0.01" placeholder="<?= $isEdit ? 'Stock final' : 'Quantidade' ?>" value="<?= htmlspecialchars($edit['quantity'] ?? '') ?>" required></div>
-    <div class="col-md-1"><input class="form-control" name="min_quantity" type="number" min="0" step="0.01" placeholder="Mín." value="<?= htmlspecialchars($edit['min_quantity'] ?? '') ?>" required></div>
-    <div class="col-md-1"><button class="btn btn-primary w-100" title="Guardar stock" aria-label="Guardar stock"><i class="bi bi-save"></i></button></div>
-</form>
 <div class="table-responsive data-shell">
     <table class="table align-middle">
         <thead>
@@ -71,4 +71,3 @@ $exportSuffix = $filterQuery ? '&' . $filterQuery : '';
         </tbody>
     </table>
 </div>
-<div class="table-responsive data-shell"><table class="table align-middle"><thead><tr><th>Artigo</th><th>Designação</th><th>Armazém</th><th>Setor</th><th>Localização</th><th>Qtd</th><th>Mín.</th><th>Valor</th><th>Ações</th></tr></thead><tbody><?php foreach($rows as $r): ?><tr class="<?= $r['quantity'] <= $r['min_quantity'] ? 'table-warning' : '' ?>"><td><?= htmlspecialchars($r['item']) ?></td><td><?= htmlspecialchars($r['designation'] ?? '') ?></td><td><?= htmlspecialchars($r['warehouse']) ?></td><td><?= htmlspecialchars($r['section'] ?? '') ?></td><td><?= htmlspecialchars($r['location'] ?? '') ?></td><td><strong><?= htmlspecialchars($r['quantity'].' '.$r['unit']) ?></strong></td><td><?= htmlspecialchars($r['min_quantity']) ?></td><td>€ <?= number_format((float)$r['stock_value'],2,',','.') ?></td><td><a class="btn btn-sm btn-outline-primary" href="<?= \App\Core\Url::page('inventory') ?>&edit=<?= $r['id'] ?>" title="Editar" aria-label="Editar"><i class="bi bi-pencil"></i></a> <a class="btn btn-sm btn-outline-danger" href="<?= \App\Core\Url::page('inventory') ?>&delete=<?= $r['id'] ?>" onclick="return confirm('Apagar stock?')" title="Apagar" aria-label="Apagar"><i class="bi bi-trash"></i></a></td></tr><?php endforeach; ?></tbody></table></div>
