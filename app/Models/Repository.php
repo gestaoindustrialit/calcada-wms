@@ -160,7 +160,7 @@ class Repository extends Model
                 if ($warehouse === '') { $result['errors'][] = "Linha {$line}: armazém em falta."; continue; }
                 $warehouseId = $this->findOrCreateWarehouse($warehouse, $section, $location);
                 if ($section !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Setor', $section, $section);
-                if ($location !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Posição', $location, $section ?: $location);
+                if ($location !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Posição', $location, $location);
                 $this->saveInventory(['item_id'=>$itemId,'warehouse_id'=>$warehouseId,'quantity'=>(float)str_replace(',', '.', $quantity ?: '0'),'min_quantity'=>(float)str_replace(',', '.', $minQuantity ?: '0')]);
                 $result['stocked']++;
             }
@@ -171,17 +171,23 @@ class Repository extends Model
 
     private function findOrCreateWarehouse(string $name, string $section = '', string $location = ''): int
     {
-        $stmt = $this->db->prepare('SELECT id FROM warehouses WHERE name = ? LIMIT 1');
+        $stmt = $this->db->prepare('SELECT * FROM warehouses WHERE LOWER(name) = LOWER(?) LIMIT 1');
         $stmt->execute([$name]);
-        $id = $stmt->fetchColumn();
-        if ($id) return (int)$id;
+        $warehouse = $stmt->fetch();
+        if ($warehouse) {
+            $updates = [];
+            if ($section !== '' && in_array(trim((string)$warehouse['section']), ['', '-'], true)) $updates['section'] = $section;
+            if ($location !== '' && in_array(trim((string)$warehouse['location']), ['', '-'], true)) $updates['location'] = $location;
+            if ($updates) $this->update('warehouses', (int)$warehouse['id'], $updates);
+            return (int)$warehouse['id'];
+        }
         $this->insert('warehouses', ['name'=>$name, 'section'=>$section ?: '-', 'location'=>$location ?: '-']);
         return (int)$this->db->lastInsertId();
     }
 
     private function findOrCreateWarehouseLocation(int $warehouseId, string $type, string $code, string $description = ''): void
     {
-        $stmt = $this->db->prepare('SELECT id FROM warehouse_locations WHERE warehouse_id = ? AND type = ? AND code = ? LIMIT 1');
+        $stmt = $this->db->prepare('SELECT id FROM warehouse_locations WHERE warehouse_id = ? AND LOWER(type) = LOWER(?) AND LOWER(code) = LOWER(?) LIMIT 1');
         $stmt->execute([$warehouseId, $type, $code]);
         if ($stmt->fetchColumn()) return;
         $this->insert('warehouse_locations', ['warehouse_id'=>$warehouseId, 'type'=>$type, 'code'=>$code, 'description'=>$description]);
