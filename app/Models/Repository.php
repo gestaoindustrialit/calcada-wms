@@ -104,10 +104,10 @@ class Repository extends Model
         if (($filters['stock_status'] ?? '') === 'low') $where[] = 'inventory.quantity <= inventory.min_quantity';
         if (($filters['stock_status'] ?? '') === 'available') $where[] = 'inventory.quantity > inventory.min_quantity';
         if (($filters['q'] ?? '') !== '') {
-            $where[] = '(items.name LIKE :q OR items.designation LIKE :q OR warehouses.name LIKE :q)';
+            $where[] = '(items.name LIKE :q OR items.designation LIKE :q OR warehouses.name LIKE :q OR warehouses.section LIKE :q OR warehouses.location LIKE :q)';
             $params['q'] = '%' . trim((string)$filters['q']) . '%';
         }
-        $sql = "SELECT inventory.*, items.name AS item, items.designation, items.unit, items.weighted_price, warehouses.name AS warehouse,
+        $sql = "SELECT inventory.*, items.name AS item, items.designation, items.unit, items.weighted_price, warehouses.name AS warehouse, warehouses.section, warehouses.location,
             (inventory.quantity * items.weighted_price) AS stock_value
             FROM inventory JOIN items ON items.id=inventory.item_id JOIN warehouses ON warehouses.id=inventory.warehouse_id";
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);

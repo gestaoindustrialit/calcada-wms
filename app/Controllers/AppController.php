@@ -190,8 +190,8 @@ class AppController extends Controller
         $rows = $this->repo->inventory($filters);
         if ($type === 'excel') {
             header('Content-Type: text/csv; charset=utf-8'); header('Content-Disposition: attachment; filename=inventario.csv');
-            $out = fopen('php://output','w'); fputcsv($out, ['Artigo','Armazém','Qtd','Unidade','P. Ponderado','Valor']);
-            foreach($rows as $r){ fputcsv($out, [$r['item'],$r['warehouse'],$r['quantity'],$r['unit'],$r['weighted_price'],$r['stock_value']]); } exit;
+            $out = fopen('php://output','w'); fputcsv($out, ['Artigo','Armazém','Setor','Localização','Qtd','Unidade','P. Ponderado','Valor']);
+            foreach($rows as $r){ fputcsv($out, [$r['item'],$r['warehouse'],$r['section'],$r['location'],$r['quantity'],$r['unit'],$r['weighted_price'],$r['stock_value']]); } exit;
         }
         header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename=inventario.pdf');
         $summary = $this->repo->inventorySummary($rows);
@@ -216,15 +216,17 @@ class AppController extends Controller
         $content .= "1 1 1 rg\n" . $textAt(42, 766, 20, 'Inventário') . $textAt(42, 744, 10, 'Relatório de stock filtrado');
         $content .= "0.10 0.16 0.28 rg\n" . $textAt(42, 700, 9, 'Linhas: ' . $summary['lines']) . $textAt(170, 700, 9, 'Quantidade total: ' . number_format((float)$summary['quantity'], 2, ',', '.')) . $textAt(360, 700, 9, 'Valor total: EUR ' . number_format((float)$summary['value'], 2, ',', '.'));
         $content .= "0.94 0.96 0.99 rg 36 660 540 24 re f\n0.78 0.82 0.90 RG 36 660 540 24 re S\n0.20 0.25 0.34 rg\n";
-        $content .= $textAt(46, 668, 8, 'Artigo') . $textAt(196, 668, 8, 'Armazém') . $textAt(336, 668, 8, 'Quantidade') . $textAt(436, 668, 8, 'Valor');
+        $content .= $textAt(46, 668, 8, 'Artigo') . $textAt(166, 668, 8, 'Armazém') . $textAt(276, 668, 8, 'Setor') . $textAt(366, 668, 8, 'Localização') . $textAt(456, 668, 8, 'Qtd') . $textAt(512, 668, 8, 'Valor');
         $y = 638;
         foreach (array_slice($rows, 0, 30) as $index => $r) {
             $content .= ($index % 2 === 0 ? "0.99 1 1 rg" : "0.96 0.98 1 rg") . " 36 " . ($y - 7) . " 540 22 re f\n";
             $content .= "0.10 0.16 0.28 rg\n";
-            $content .= $textAt(46, $y, 8, mb_strimwidth((string)$r['item'], 0, 34, '…', 'UTF-8'));
-            $content .= $textAt(196, $y, 8, mb_strimwidth((string)$r['warehouse'], 0, 30, '…', 'UTF-8'));
-            $content .= $textAt(336, $y, 8, $r['quantity'] . ' ' . $r['unit']);
-            $content .= $textAt(436, $y, 8, 'EUR ' . number_format((float)$r['stock_value'], 2, ',', '.'));
+            $content .= $textAt(46, $y, 7, mb_strimwidth((string)$r['item'], 0, 27, '…', 'UTF-8'));
+            $content .= $textAt(166, $y, 7, mb_strimwidth((string)$r['warehouse'], 0, 24, '…', 'UTF-8'));
+            $content .= $textAt(276, $y, 7, mb_strimwidth((string)($r['section'] ?? ''), 0, 20, '…', 'UTF-8'));
+            $content .= $textAt(366, $y, 7, mb_strimwidth((string)($r['location'] ?? ''), 0, 20, '…', 'UTF-8'));
+            $content .= $textAt(456, $y, 7, $r['quantity'] . ' ' . $r['unit']);
+            $content .= $textAt(512, $y, 7, 'EUR ' . number_format((float)$r['stock_value'], 2, ',', '.'));
             $y -= 22;
         }
         if (count($rows) > 30) {
