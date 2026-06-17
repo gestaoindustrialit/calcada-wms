@@ -129,9 +129,9 @@ class Repository extends Model
         $this->db->prepare('UPDATE requests SET status = ? WHERE id = ?')->execute([$status, $id]);
     }
 
-    public function importItems(array $file): array
+    public function importItems(array $file, bool $withLocation = false): array
     {
-        $result = ['created'=>0,'updated'=>0,'errors'=>[]];
+        $result = ['created'=>0,'updated'=>0,'stocked'=>0,'errors'=>[]];
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) { $result['errors'][] = 'Ficheiro inválido.'; return $result; }
         $handle = fopen($file['tmp_name'], 'r');
         if (!$handle) { $result['errors'][] = 'Não foi possível abrir o CSV.'; return $result; }
@@ -140,17 +140,57 @@ class Repository extends Model
             $line++;
             if (count($row) === 1) $row = str_getcsv($row[0], ',');
             if ($line === 1 && preg_match('/nome|name|artigo/i', $row[0] ?? '')) continue;
-            [$name,$designation,$unit,$price] = array_pad(array_map('trim', $row), 4, '');
+            [$name,$designation,$unit,$price,$warehouse,$section,$location,$quantity,$minQuantity] = array_pad(array_map('trim', $row), 9, '');
             if ($name === '') { $result['errors'][] = "Linha {$line}: nome em falta."; continue; }
             $price = (float)str_replace(',', '.', $price ?: '0');
             $stmt = $this->db->prepare('SELECT id FROM items WHERE name = ? LIMIT 1');
             $stmt->execute([$name]);
             $id = $stmt->fetchColumn();
             $data = ['name'=>$name,'designation'=>$designation ?: $name,'unit'=>$unit ?: 'un','weighted_price'=>$price];
-            if ($id) { $this->update('items', (int)$id, $data); $result['updated']++; } else { $this->insert('items', $data); $result['created']++; }
+            if ($id) {
+                $this->update('items', (int)$id, $data);
+                $itemId = (int)$id;
+                $result['updated']++;
+            } else {
+                $this->insert('items', $data);
+                $itemId = (int)$this->db->lastInsertId();
+                $result['created']++;
+            }
+            if ($withLocation) {
+                if ($warehouse === '') { $result['errors'][] = "Linha {$line}: armazém em falta."; continue; }
+                $warehouseId = $this->findOrCreateWarehouse($warehouse, $section, $location);
+                if ($section !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Setor', $section, $section);
+                if ($location !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Posição', $location, $location);
+                $this->saveInventory(['item_id'=>$itemId,'warehouse_id'=>$warehouseId,'quantity'=>(float)str_replace(',', '.', $quantity ?: '0'),'min_quantity'=>(float)str_replace(',', '.', $minQuantity ?: '0')]);
+                $result['stocked']++;
+            }
         }
         fclose($handle);
         return $result;
+    }
+
+    private function findOrCreateWarehouse(string $name, string $section = '', string $location = ''): int
+    {
+        $stmt = $this->db->prepare('SELECT * FROM warehouses WHERE LOWER(name) = LOWER(?) LIMIT 1');
+        $stmt->execute([$name]);
+        $warehouse = $stmt->fetch();
+        if ($warehouse) {
+            $updates = [];
+            if ($section !== '' && in_array(trim((string)$warehouse['section']), ['', '-'], true)) $updates['section'] = $section;
+            if ($location !== '' && in_array(trim((string)$warehouse['location']), ['', '-'], true)) $updates['location'] = $location;
+            if ($updates) $this->update('warehouses', (int)$warehouse['id'], $updates);
+            return (int)$warehouse['id'];
+        }
+        $this->insert('warehouses', ['name'=>$name, 'section'=>$section ?: '-', 'location'=>$location ?: '-']);
+        return (int)$this->db->lastInsertId();
+    }
+
+    private function findOrCreateWarehouseLocation(int $warehouseId, string $type, string $code, string $description = ''): void
+    {
+        $stmt = $this->db->prepare('SELECT id FROM warehouse_locations WHERE warehouse_id = ? AND LOWER(type) = LOWER(?) AND LOWER(code) = LOWER(?) LIMIT 1');
+        $stmt->execute([$warehouseId, $type, $code]);
+        if ($stmt->fetchColumn()) return;
+        $this->insert('warehouse_locations', ['warehouse_id'=>$warehouseId, 'type'=>$type, 'code'=>$code, 'description'=>$description]);
     }
 
     public function spendingByPeriod(?array $user = null): array
