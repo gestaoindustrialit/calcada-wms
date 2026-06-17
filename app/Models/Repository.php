@@ -65,17 +65,27 @@ class Repository extends Model
         return $stmt->fetchAll();
     }
 
-    public function saveInventory(array $data): void
+    public function saveInventory(array $data, string $movementType = 'in'): void
     {
+        $quantity = abs((float)($data['quantity'] ?? 0));
+        $delta = $movementType === 'out' ? -$quantity : $quantity;
+        $data['quantity'] = $movementType === 'set' ? (float)($data['quantity'] ?? 0) : $delta;
         $stmt = $this->db->prepare('SELECT id, quantity FROM inventory WHERE item_id = ? AND warehouse_id = ?');
         $stmt->execute([(int)$data['item_id'], (int)$data['warehouse_id']]);
         $existing = $stmt->fetch();
         if ($existing) {
-            $this->db->prepare('UPDATE inventory SET quantity = quantity + :quantity, min_quantity = :min_quantity WHERE id = :id')->execute([
-                'quantity'=>(float)$data['quantity'], 'min_quantity'=>(float)$data['min_quantity'], 'id'=>(int)$existing['id'],
-            ]);
+            if ($movementType === 'set') {
+                $this->db->prepare('UPDATE inventory SET quantity = MAX(:quantity, 0), min_quantity = :min_quantity WHERE id = :id')->execute([
+                    'quantity'=>(float)$data['quantity'], 'min_quantity'=>(float)$data['min_quantity'], 'id'=>(int)$existing['id'],
+                ]);
+            } else {
+                $this->db->prepare('UPDATE inventory SET quantity = MAX(quantity + :quantity, 0), min_quantity = :min_quantity WHERE id = :id')->execute([
+                    'quantity'=>(float)$data['quantity'], 'min_quantity'=>(float)$data['min_quantity'], 'id'=>(int)$existing['id'],
+                ]);
+            }
             return;
         }
+        $data['quantity'] = max((float)$data['quantity'], 0);
         $this->insert('inventory', $data);
     }
 
@@ -85,11 +95,35 @@ class Repository extends Model
         $stmt->execute(['quantity'=>$quantity, 'item_id'=>$itemId, 'warehouse_id'=>$warehouseId]);
     }
 
-    public function inventory(): array
+    public function inventory(array $filters = []): array
     {
-        return $this->db->query("SELECT inventory.*, items.name AS item, items.unit, items.weighted_price, warehouses.name AS warehouse,
+        $where = [];
+        $params = [];
+        if (!empty($filters['item_id'])) { $where[] = 'inventory.item_id = :item_id'; $params['item_id'] = (int)$filters['item_id']; }
+        if (!empty($filters['warehouse_id'])) { $where[] = 'inventory.warehouse_id = :warehouse_id'; $params['warehouse_id'] = (int)$filters['warehouse_id']; }
+        if (($filters['stock_status'] ?? '') === 'low') $where[] = 'inventory.quantity <= inventory.min_quantity';
+        if (($filters['stock_status'] ?? '') === 'available') $where[] = 'inventory.quantity > inventory.min_quantity';
+        if (($filters['q'] ?? '') !== '') {
+            $where[] = '(items.name LIKE :q OR items.designation LIKE :q OR warehouses.name LIKE :q OR warehouses.section LIKE :q OR warehouses.location LIKE :q)';
+            $params['q'] = '%' . trim((string)$filters['q']) . '%';
+        }
+        $sql = "SELECT inventory.*, items.name AS item, items.designation, items.unit, items.weighted_price, warehouses.name AS warehouse, warehouses.section, warehouses.location,
             (inventory.quantity * items.weighted_price) AS stock_value
-            FROM inventory JOIN items ON items.id=inventory.item_id JOIN warehouses ON warehouses.id=inventory.warehouse_id ORDER BY inventory.id DESC")->fetchAll();
+            FROM inventory JOIN items ON items.id=inventory.item_id JOIN warehouses ON warehouses.id=inventory.warehouse_id";
+        if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
+        $sql .= ' ORDER BY items.name ASC, warehouses.name ASC';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public function inventorySummary(array $rows): array
+    {
+        return [
+            'lines' => count($rows),
+            'quantity' => array_sum(array_map(fn($r) => (float)$r['quantity'], $rows)),
+            'value' => array_sum(array_map(fn($r) => (float)$r['stock_value'], $rows)),
+        ];
     }
 
     public function requests(?array $user = null): array
