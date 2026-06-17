@@ -67,7 +67,9 @@ class AppController extends Controller
             $this->repo->delete('inventory', (int)$_GET['delete']);
             $this->redirect(Url::page('inventory'));
         }
-        $this->view('inventory/index', ['title'=>'Inventário','rows'=>$this->repo->inventory(),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$this->editRow('inventory')]);
+        $filters = array_intersect_key($_GET, array_flip(['q','item_id','warehouse_id','stock_status']));
+        $rows = $this->repo->inventory($filters);
+        $this->view('inventory/index', ['title'=>'Inventário','rows'=>$rows,'summary'=>$this->repo->inventorySummary($rows),'filters'=>$filters,'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$this->editRow('inventory')]);
     }
     public function requests(): void
     {
@@ -103,9 +105,9 @@ class AppController extends Controller
         $this->ensureChiefAllowed();
         $data = array_intersect_key($_POST, array_flip(['item_id','warehouse_id','quantity','min_quantity']));
         if (!empty($_POST['id'])) {
-            $this->repo->update('inventory', (int)$_POST['id'], $data);
+            $this->repo->saveInventory($data, 'set');
         } else {
-            $this->repo->saveInventory($data);
+            $this->repo->saveInventory($data, $_POST['movement_type'] ?? 'in');
         }
         $this->redirect(Url::page('inventory'));
     }
@@ -184,14 +186,53 @@ class AppController extends Controller
     public function export(string $type): void
     {
         $this->ensureChiefAllowed();
-        $rows = $this->repo->inventory();
+        $filters = array_intersect_key($_GET, array_flip(['q','item_id','warehouse_id','stock_status']));
+        $rows = $this->repo->inventory($filters);
         if ($type === 'excel') {
             header('Content-Type: text/csv; charset=utf-8'); header('Content-Disposition: attachment; filename=inventario.csv');
-            $out = fopen('php://output','w'); fputcsv($out, ['Artigo','Armazém','Qtd','Unidade','P. Ponderado','Valor']);
-            foreach($rows as $r){ fputcsv($out, [$r['item'],$r['warehouse'],$r['quantity'],$r['unit'],$r['weighted_price'],$r['stock_value']]); } exit;
+            $out = fopen('php://output','w'); fputcsv($out, ['Artigo','Armazém','Setor','Localização','Qtd','Unidade','P. Ponderado','Valor']);
+            foreach($rows as $r){ fputcsv($out, [$r['item'],$r['warehouse'],$r['section'],$r['location'],$r['quantity'],$r['unit'],$r['weighted_price'],$r['stock_value']]); } exit;
         }
         header('Content-Type: application/pdf'); header('Content-Disposition: attachment; filename=inventario.pdf');
-        $text = "Inventario\n" . implode("\n", array_map(fn($r)=>$r['item'].' - '.$r['warehouse'].' - '.$r['quantity'].' '.$r['unit'].' - EUR '.number_format((float)$r['stock_value'],2), $rows));
-        echo "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>>>>>endobj\n4 0 obj<</Length ".(strlen($text)+60).">>stream\nBT /F1 12 Tf 50 750 Td (".str_replace(['(',')',"\n"], ['[',']',') Tj T* ('], $text).") Tj ET\nendstream endobj\nxref\n0 5\n0000000000 65535 f \ntrailer<</Root 1 0 R/Size 5>>\n%%EOF"; exit;
+        $summary = $this->repo->inventorySummary($rows);
+        $pdfText = function ($value): string {
+            $encoded = iconv('UTF-8', 'Windows-1252//TRANSLIT', (string)$value) ?: (string)$value;
+            $out = '';
+            for ($i = 0, $length = strlen($encoded); $i < $length; $i++) {
+                $ord = ord($encoded[$i]);
+                if ($encoded[$i] === '(' || $encoded[$i] === ')' || $encoded[$i] === '\\') {
+                    $out .= '\\' . $encoded[$i];
+                } elseif ($ord < 32 || $ord > 126) {
+                    $out .= sprintf('\\%03o', $ord);
+                } else {
+                    $out .= $encoded[$i];
+                }
+            }
+            return '(' . $out . ')';
+        };
+        $textAt = fn($x, $y, $size, $text) => "BT /F1 {$size} Tf 1 0 0 1 {$x} {$y} Tm " . $pdfText($text) . " Tj ET\n";
+        $content = "0.07 0.09 0.17 rg 0 730 612 62 re f\n";
+        $content .= "0.31 0.27 0.90 rg 0 724 612 6 re f\n";
+        $content .= "1 1 1 rg\n" . $textAt(42, 766, 20, 'Inventário') . $textAt(42, 744, 10, 'Relatório de stock filtrado');
+        $content .= "0.10 0.16 0.28 rg\n" . $textAt(42, 700, 9, 'Linhas: ' . $summary['lines']) . $textAt(170, 700, 9, 'Quantidade total: ' . number_format((float)$summary['quantity'], 2, ',', '.')) . $textAt(360, 700, 9, 'Valor total: EUR ' . number_format((float)$summary['value'], 2, ',', '.'));
+        $content .= "0.94 0.96 0.99 rg 36 660 540 24 re f\n0.78 0.82 0.90 RG 36 660 540 24 re S\n0.20 0.25 0.34 rg\n";
+        $content .= $textAt(46, 668, 8, 'Artigo') . $textAt(166, 668, 8, 'Armazém') . $textAt(276, 668, 8, 'Setor') . $textAt(366, 668, 8, 'Localização') . $textAt(456, 668, 8, 'Qtd') . $textAt(512, 668, 8, 'Valor');
+        $y = 638;
+        foreach (array_slice($rows, 0, 30) as $index => $r) {
+            $content .= ($index % 2 === 0 ? "0.99 1 1 rg" : "0.96 0.98 1 rg") . " 36 " . ($y - 7) . " 540 22 re f\n";
+            $content .= "0.10 0.16 0.28 rg\n";
+            $content .= $textAt(46, $y, 7, mb_strimwidth((string)$r['item'], 0, 27, '…', 'UTF-8'));
+            $content .= $textAt(166, $y, 7, mb_strimwidth((string)$r['warehouse'], 0, 24, '…', 'UTF-8'));
+            $content .= $textAt(276, $y, 7, mb_strimwidth((string)($r['section'] ?? ''), 0, 20, '…', 'UTF-8'));
+            $content .= $textAt(366, $y, 7, mb_strimwidth((string)($r['location'] ?? ''), 0, 20, '…', 'UTF-8'));
+            $content .= $textAt(456, $y, 7, $r['quantity'] . ' ' . $r['unit']);
+            $content .= $textAt(512, $y, 7, 'EUR ' . number_format((float)$r['stock_value'], 2, ',', '.'));
+            $y -= 22;
+        }
+        if (count($rows) > 30) {
+            $content .= "0.40 0.45 0.55 rg\n" . $textAt(42, $y - 8, 8, 'Exportação limitada às primeiras 30 linhas no PDF. Use CSV para a lista completa.');
+        }
+        $content .= "0.55 0.60 0.70 rg\n" . $textAt(42, 34, 8, 'Calçada WMS · inventário exportado em ' . date('d/m/Y H:i'));
+        echo "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>>>>>endobj\n4 0 obj<</Length ".strlen($content).">>stream\n".$content."endstream endobj\nxref\n0 5\n0000000000 65535 f\ntrailer<</Root 1 0 R/Size 5>>\n%%EOF"; exit;
     }
 }
