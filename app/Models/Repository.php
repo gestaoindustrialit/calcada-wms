@@ -126,7 +126,7 @@ class Repository extends Model
         ];
     }
 
-    public function requests(?array $user = null): array
+    public function requests(?array $user = null, string $sort = 'recent'): array
     {
         $where = '';
         $params = [];
@@ -134,13 +134,23 @@ class Repository extends Model
             $where = 'WHERE requests.requester = :name';
             $params = ['name'=>$user['name'] ?? ''];
         }
-        $stmt = $this->db->prepare("SELECT requests.*, items.name AS item, items.weighted_price, warehouses.name AS warehouse,
+        $orders = [
+            'recent' => 'requests.created_at DESC, requests.id DESC',
+            'oldest' => 'requests.created_at ASC, requests.id ASC',
+            'status' => 'requests.status ASC, requests.created_at DESC',
+            'requester' => 'requests.requester ASC, requests.created_at DESC',
+            'team' => 'requests.team ASC, requests.created_at DESC',
+            'value_desc' => 'request_value DESC, requests.created_at DESC',
+            'value_asc' => 'request_value ASC, requests.created_at DESC',
+        ];
+        $orderBy = $orders[$sort] ?? $orders['recent'];
+        $stmt = $this->db->prepare("SELECT requests.*, items.name AS item, items.designation, items.weighted_price, warehouses.name AS warehouse,
             (requests.quantity * items.weighted_price) AS request_value,
             ((requests.quantity - requests.delivered_quantity) * items.weighted_price) AS pending_value
             FROM requests JOIN items ON items.id=requests.item_id
             LEFT JOIN warehouses ON warehouses.id=requests.warehouse_id
             {$where}
-            ORDER BY requests.created_at DESC");
+            ORDER BY {$orderBy}");
         $stmt->execute($params);
         return $stmt->fetchAll();
     }
@@ -160,7 +170,23 @@ class Repository extends Model
 
     public function setRequestStatus(int $id, string $status): void
     {
+        $request = $this->find('requests', $id);
+        if ($request && !empty($request['request_group'])) {
+            $this->db->prepare('UPDATE requests SET status = ? WHERE request_group = ?')->execute([$status, $request['request_group']]);
+            return;
+        }
         $this->db->prepare('UPDATE requests SET status = ? WHERE id = ?')->execute([$status, $id]);
+    }
+
+    public function deleteRequestGroup(int $id): void
+    {
+        $request = $this->find('requests', $id);
+        if (!$request) return;
+        if (!empty($request['request_group'])) {
+            $this->db->prepare('DELETE FROM requests WHERE request_group = ?')->execute([$request['request_group']]);
+            return;
+        }
+        $this->delete('requests', $id);
     }
 
     public function importItems(array $file, bool $withLocation = false): array
