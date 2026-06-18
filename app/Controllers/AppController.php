@@ -79,7 +79,8 @@ class AppController extends Controller
         if ($edit && !$canManageRequests) {
             $this->redirect(Url::page('requests'));
         }
-        $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$edit, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests]);
+        $sort = $_GET['sort'] ?? 'recent';
+        $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user, $sort),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$edit, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests, 'sort'=>$sort]);
     }
     public function reports(): void { $user = Auth::user(); $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam($user), 'currentUser'=>$user]); }
     private function crud(string $table, array $fields, string $view, string $title): void
@@ -130,6 +131,7 @@ class AppController extends Controller
             $data['status'] = $status;
             $this->repo->update('requests', (int)$_POST['id'], $data);
         } else {
+            $requestGroup = bin2hex(random_bytes(8));
             foreach (($_POST['items'] ?? []) as $line) {
                 if (empty($line['item_id']) || empty($line['quantity'])) {
                     continue;
@@ -138,6 +140,7 @@ class AppController extends Controller
                 $data['requester'] = $requester;
                 $data['team'] = $team;
                 $data['status'] = $status;
+                $data['request_group'] = $requestGroup;
                 $this->repo->insert('requests', $data);
             }
         }
@@ -156,10 +159,14 @@ class AppController extends Controller
             if ($action === 'approve') {
                 $this->repo->setRequestStatus($id, 'Aprovado');
             } elseif ($action === 'deliver') {
-                $quantity = isset($_POST['deliver_quantity']) ? (float)$_POST['deliver_quantity'] : ((float)$request['quantity'] - (float)$request['delivered_quantity']);
-                $this->repo->deliverRequest($id, $quantity);
+                if (!in_array($request['status'], ['Cancelado', 'Entregue'], true)) {
+                    $quantity = isset($_POST['deliver_quantity']) ? (float)$_POST['deliver_quantity'] : ((float)$request['quantity'] - (float)$request['delivered_quantity']);
+                    $this->repo->deliverRequest($id, $quantity);
+                }
             } elseif ($action === 'cancel') {
                 $this->repo->setRequestStatus($id, 'Cancelado');
+            } elseif ($action === 'delete') {
+                $this->repo->deleteRequestGroup($id);
             }
         }
         $this->redirect(Url::page('requests'));

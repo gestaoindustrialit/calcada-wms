@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS requests (
     delivered_quantity REAL NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'Pendente',
     notes TEXT,
+    request_group TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(item_id) REFERENCES items(id)
 );

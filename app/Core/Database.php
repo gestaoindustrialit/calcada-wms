@@ -37,6 +37,7 @@ class Database
         self::ensureColumn('requests', 'warehouse_id', 'INTEGER');
         self::ensureColumn('users', 'password_hash', 'TEXT');
         self::ensureColumn('requests', 'delivered_quantity', 'REAL NOT NULL DEFAULT 0');
+        self::ensureColumn('requests', 'request_group', 'TEXT');
         self::$pdo->exec("CREATE TABLE IF NOT EXISTS warehouse_locations (id INTEGER PRIMARY KEY AUTOINCREMENT, warehouse_id INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'Setor', code TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(warehouse_id) REFERENCES warehouses(id))");
         if ((int) self::$pdo->query('SELECT COUNT(*) FROM warehouse_locations')->fetchColumn() === 0 && (int) self::$pdo->query('SELECT COUNT(*) FROM warehouses')->fetchColumn() > 0) {
             self::$pdo->exec("INSERT INTO warehouse_locations (warehouse_id,type,code,description) SELECT id,'Setor',section,location FROM warehouses");

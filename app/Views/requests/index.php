@@ -45,4 +45,24 @@ $articleRows = $isEdit ? [[
         <button class="btn btn-primary" title="Guardar pedido" aria-label="Guardar pedido"><i class="bi bi-send"></i></button>
     </div>
 </form>
+
+<div class="request-toolbar mb-3">
+    <form method="get" class="request-sort-form">
+        <input type="hidden" name="page" value="requests">
+        <label class="form-label mb-0" for="requestSort">Ordenar por</label>
+        <select id="requestSort" class="form-select" name="sort" onchange="this.form.submit()">
+            <?php foreach ([
+                'recent' => 'Mais recentes',
+                'oldest' => 'Mais antigos',
+                'status' => 'Estado',
+                'requester' => 'Requisitante',
+                'team' => 'Equipa',
+                'value_desc' => 'Valor decrescente',
+                'value_asc' => 'Valor crescente',
+            ] as $sortKey => $sortLabel): ?>
+                <option value="<?= $sortKey ?>" <?= ($sort ?? 'recent') === $sortKey ? 'selected' : '' ?>><?= $sortLabel ?></option>
+            <?php endforeach; ?>
+        </select>
+    </form>
+</div>
 <?php require dirname(__DIR__).'/partials/requests_table.php'; ?>
