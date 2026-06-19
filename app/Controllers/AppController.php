@@ -149,7 +149,7 @@ class AppController extends Controller
     public function requestAction(): void
     {
         $id = (int)($_GET['id'] ?? 0);
-        $action = $_GET['do'] ?? '';
+        $action = $_POST['request_action'] ?? ($_GET['do'] ?? '');
         $request = $this->repo->find('requests', $id);
         if ($request) {
             $user = Auth::user();
