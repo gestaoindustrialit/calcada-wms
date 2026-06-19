@@ -155,6 +155,19 @@ class Repository extends Model
         return $stmt->fetchAll();
     }
 
+
+    public function requestGroupLines(int $id): array
+    {
+        $request = $this->find('requests', $id);
+        if (!$request) return [];
+        if (!empty($request['request_group'])) {
+            $stmt = $this->db->prepare('SELECT * FROM requests WHERE request_group = ? ORDER BY id ASC');
+            $stmt->execute([$request['request_group']]);
+            return $stmt->fetchAll();
+        }
+        return [$request];
+    }
+
     public function deliverRequest(int $id, float $quantity): void
     {
         $request = $this->find('requests', $id);

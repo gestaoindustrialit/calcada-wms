@@ -262,5 +262,6 @@ main.container-fluid { max-width: 1640px; padding-inline: 1.4rem; }
 .request-items-list span { display: block; }
 .delivery-line { display: grid; grid-template-columns: 1fr 120px auto; align-items: center; gap: .75rem; padding: .75rem 0; border-bottom: 1px solid var(--line); }
 .delivery-line:last-child { border-bottom: 0; }
+.delivery-actions { margin-top: 1rem; }
 .delivery-line small { display: block; color: var(--muted); margin-top: .2rem; }
 @media (max-width: 768px) { .request-toolbar { justify-content: stretch; } .request-sort-form, .request-sort-form .form-select { width: 100%; } .request-sort-form { align-items: stretch; flex-direction: column; } .delivery-line { grid-template-columns: 1fr; } }

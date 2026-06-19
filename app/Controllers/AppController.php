@@ -160,8 +160,19 @@ class AppController extends Controller
                 $this->repo->setRequestStatus($id, 'Aprovado');
             } elseif ($action === 'deliver') {
                 if (!in_array($request['status'], ['Cancelado', 'Entregue'], true)) {
-                    $quantity = isset($_POST['deliver_quantity']) ? (float)$_POST['deliver_quantity'] : ((float)$request['quantity'] - (float)$request['delivered_quantity']);
+                    $postedQuantities = $_POST['deliver_quantities'] ?? [];
+                    $quantity = isset($postedQuantities[$id]) ? (float)$postedQuantities[$id] : (isset($_POST['deliver_quantity']) ? (float)$_POST['deliver_quantity'] : ((float)$request['quantity'] - (float)$request['delivered_quantity']));
                     $this->repo->deliverRequest($id, $quantity);
+                }
+            } elseif ($action === 'deliver_all') {
+                foreach ($this->repo->requestGroupLines($id) as $line) {
+                    if (in_array($line['status'], ['Cancelado', 'Entregue'], true)) {
+                        continue;
+                    }
+                    $postedQuantities = $_POST['deliver_quantities'] ?? [];
+                    $lineId = (int)$line['id'];
+                    $quantity = isset($postedQuantities[$lineId]) ? (float)$postedQuantities[$lineId] : ((float)$line['quantity'] - (float)$line['delivered_quantity']);
+                    $this->repo->deliverRequest($lineId, $quantity);
                 }
             } elseif ($action === 'cancel') {
                 $this->repo->setRequestStatus($id, 'Cancelado');
