@@ -79,8 +79,9 @@ class AppController extends Controller
         if ($edit && !$canManageRequests) {
             $this->redirect(Url::page('requests'));
         }
+        $editLines = $edit ? $this->repo->requestGroupLines((int)$edit['id']) : [];
         $sort = $_GET['sort'] ?? 'recent';
-        $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user, $sort),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$edit, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests, 'sort'=>$sort]);
+        $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user, $sort),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$edit, 'editLines'=>$editLines, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests, 'sort'=>$sort]);
     }
     public function reports(): void { $user = Auth::user(); $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam($user), 'currentUser'=>$user]); }
     private function crud(string $table, array $fields, string $view, string $title): void
@@ -124,12 +125,19 @@ class AppController extends Controller
             if (!$canManageRequests) {
                 $this->redirect(Url::page('requests'));
             }
-            $line = $_POST['items'][0] ?? $_POST;
-            $data = array_intersect_key($line, array_flip(['item_id','warehouse_id','quantity','notes']));
-            $data['requester'] = $requester;
-            $data['team'] = $team;
-            $data['status'] = $status;
-            $this->repo->update('requests', (int)$_POST['id'], $data);
+            $editableLines = $this->repo->requestGroupLines((int)$_POST['id']);
+            $editableLineIds = array_map('intval', array_column($editableLines, 'id'));
+            foreach (($_POST['items'] ?? []) as $line) {
+                $lineId = (int)($line['id'] ?? 0);
+                if (!$lineId || !in_array($lineId, $editableLineIds, true)) {
+                    continue;
+                }
+                $data = array_intersect_key($line, array_flip(['item_id','warehouse_id','quantity','notes']));
+                $data['requester'] = $requester;
+                $data['team'] = $team;
+                $data['status'] = $status;
+                $this->repo->update('requests', $lineId, $data);
+            }
         } else {
             $requestGroup = bin2hex(random_bytes(8));
             foreach (($_POST['items'] ?? []) as $line) {

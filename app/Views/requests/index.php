@@ -3,12 +3,13 @@ $isEdit = !empty($edit);
 $canManageRequests = !empty($canManageRequests);
 $requesterValue = $canManageRequests ? ($edit['requester'] ?? $currentUser['name'] ?? '') : ($currentUser['name'] ?? '');
 $teamValue = $canManageRequests ? ($edit['team'] ?? $currentUser['team'] ?? '') : ($currentUser['team'] ?? '');
-$articleRows = $isEdit ? [[
+$articleRows = $isEdit ? ($editLines ?: [[
+    'id' => $edit['id'] ?? '',
     'item_id' => $edit['item_id'] ?? '',
     'warehouse_id' => $edit['warehouse_id'] ?? '',
     'quantity' => $edit['quantity'] ?? '',
     'notes' => $edit['notes'] ?? '',
-]] : [[
+]]) : [[
     'item_id' => '',
     'warehouse_id' => '',
     'quantity' => '',
@@ -31,6 +32,7 @@ $articleRows = $isEdit ? [[
     <div class="request-lines" data-request-lines>
         <?php foreach ($articleRows as $index => $line): ?>
             <div class="request-line" data-request-line>
+                <?php if ($isEdit): ?><input type="hidden" name="items[<?= $index ?>][id]" value="<?= (int)($line['id'] ?? 0) ?>"><?php endif; ?>
                 <div class="request-line__field request-line__article"><select class="form-select searchable-select" name="items[<?= $index ?>][item_id]" aria-label="Artigo"><?php foreach($items as $i): ?><option value="<?= $i['id'] ?>" <?= (int)($line['item_id'] ?? 0)===(int)$i['id']?'selected':'' ?>><?= htmlspecialchars($i['name'].' — '.$i['designation']) ?></option><?php endforeach; ?></select></div>
                 <div class="request-line__field request-line__warehouse"><select class="form-select" name="items[<?= $index ?>][warehouse_id]" aria-label="Armazém"><?php foreach($warehouses as $w): ?><option value="<?= $w['id'] ?>" <?= (int)($line['warehouse_id'] ?? 0)===(int)$w['id']?'selected':'' ?>><?= htmlspecialchars($w['name'].' · '.$w['section']) ?></option><?php endforeach; ?></select></div>
                 <div class="request-line__field request-line__quantity"><input class="form-control" name="items[<?= $index ?>][quantity]" type="number" min="0.01" step="0.01" placeholder="Qtd" value="<?= htmlspecialchars($line['quantity'] ?? '') ?>" required></div>

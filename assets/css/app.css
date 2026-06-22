@@ -261,6 +261,7 @@ body.modal-open .page-card { backdrop-filter: none; }
 .request-sort-form .form-select { min-width: 220px; }
 .request-items-list { display: grid; gap: .35rem; }
 .request-items-list span { display: block; }
+.request-items-list__more { color: var(--muted); font-weight: 800; letter-spacing: .12em; }
 .delivery-line { display: grid; grid-template-columns: 1fr 120px auto; align-items: center; gap: .75rem; padding: .75rem 0; border-bottom: 1px solid var(--line); }
 .delivery-line:last-child { border-bottom: 0; }
 .delivery-actions { margin-top: 1rem; }
