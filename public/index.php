@@ -20,6 +20,7 @@ $routes = [
     'login'=>fn()=> $controller->login(),
     'logout'=>fn()=> $controller->logout(),
     'dashboard'=>fn()=> $controller->dashboard(),
+    'clear_catalog'=>fn()=> $controller->clearCatalog(),
     'users'=>fn()=> $controller->users(),
     'warehouses'=>fn()=> $controller->warehouses(),
     'items'=>fn()=> $controller->items(),

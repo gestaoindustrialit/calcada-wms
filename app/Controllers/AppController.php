@@ -30,7 +30,18 @@ class AppController extends Controller
         $this->redirect(Url::page('login'));
     }
     public function dashboard(): void { $user = Auth::user(); $this->view('dashboard/index', ['title'=>'Painel', 'stats'=>$this->repo->dashboard($user), 'requests'=>$this->repo->requests($user), 'currentUser'=>$user]); }
-    public function users(): void { $this->ensureChiefAllowed(); $this->crud('users', ['name','email','role','team','password_hash'], 'users/index', 'Utilizadores'); }
+    public function clearCatalog(): void
+    {
+        $this->ensureAdminAllowed();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['confirm_clear'] ?? '') === 'ELIMINAR') {
+            $this->repo->clearItemsAndWarehouses();
+            $_SESSION['flash'] = 'Dados de artigos, armazéns, localizações, inventário e requisições eliminados.';
+        } else {
+            $_SESSION['flash'] = 'Confirmação inválida. Escreva ELIMINAR para apagar os dados.';
+        }
+        $this->redirect(Url::page('dashboard'));
+    }
+    public function users(): void { $this->ensureChiefAllowed(); $this->crud('users', ['name','email','role','team','password_hash'], 'users/index', 'Utilizadores', ['roles'=>$this->repo->roles()]); }
     public function warehouses(): void
     {
         $this->ensureChiefAllowed();
@@ -84,7 +95,7 @@ class AppController extends Controller
         $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user, $sort),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$edit, 'editLines'=>$editLines, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests, 'sort'=>$sort]);
     }
     public function reports(): void { $user = Auth::user(); $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam($user), 'currentUser'=>$user]); }
-    private function crud(string $table, array $fields, string $view, string $title): void
+    private function crud(string $table, array $fields, string $view, string $title, array $extraData = []): void
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data = array_intersect_key($_POST, array_flip($fields));
@@ -100,7 +111,7 @@ class AppController extends Controller
             $this->redirect(Url::page($table));
         }
         if (isset($_GET['delete'])) { $this->repo->delete($table, (int)$_GET['delete']); $this->redirect(Url::page($table)); }
-        $this->view($view, ['title'=>$title, 'rows'=>$this->repo->all($table), 'edit'=>$this->editRow($table)]);
+        $this->view($view, array_merge(['title'=>$title, 'rows'=>$this->repo->all($table), 'edit'=>$this->editRow($table)], $extraData));
     }
     public function saveInventory(): void
     {
@@ -201,6 +212,13 @@ class AppController extends Controller
     {
         if (strtolower((string)(Auth::user()['role'] ?? '')) === 'chefe') {
             $this->redirect(Url::page('requests'));
+        }
+    }
+
+    private function ensureAdminAllowed(): void
+    {
+        if (strtolower((string)(Auth::user()['role'] ?? '')) !== 'admin') {
+            $this->redirect(Url::page('dashboard'));
         }
     }
 
