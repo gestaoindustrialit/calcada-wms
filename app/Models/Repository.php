@@ -57,6 +57,30 @@ class Repository extends Model
     public function items(): array { return $this->all('items'); }
     public function warehouses(): array { return $this->all('warehouses'); }
 
+    public function roles(): array
+    {
+        $rows = $this->db->query("SELECT DISTINCT role FROM users WHERE TRIM(role) != '' ORDER BY role ASC")->fetchAll();
+        $roles = array_values(array_unique(array_filter(array_merge(['Admin', 'Chefe', 'Compras', 'Stock'], array_column($rows, 'role')))));
+        natcasesort($roles);
+        return array_values($roles);
+    }
+
+    public function clearItemsAndWarehouses(): void
+    {
+        $this->db->beginTransaction();
+        try {
+            $this->db->exec('DELETE FROM requests');
+            $this->db->exec('DELETE FROM inventory');
+            $this->db->exec('DELETE FROM warehouse_locations');
+            $this->db->exec('DELETE FROM items');
+            $this->db->exec('DELETE FROM warehouses');
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
     public function warehouseLocations(?int $warehouseId = null): array
     {
         $where = $warehouseId ? 'WHERE warehouse_locations.warehouse_id = :warehouse_id' : '';
@@ -208,14 +232,36 @@ class Repository extends Model
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) { $result['errors'][] = 'Ficheiro inválido.'; return $result; }
         $handle = fopen($file['tmp_name'], 'r');
         if (!$handle) { $result['errors'][] = 'Não foi possível abrir o CSV.'; return $result; }
+
+        $delimiter = ';';
+        $headerMap = null;
         $line = 0;
-        while (($row = fgetcsv($handle, 0, ';')) !== false) {
+        while (($raw = fgets($handle)) !== false) {
             $line++;
-            if (count($row) === 1) $row = str_getcsv($row[0], ',');
-            if ($line === 1 && preg_match('/nome|name|artigo/i', $row[0] ?? '')) continue;
-            [$name,$designation,$unit,$price,$warehouse,$section,$location,$quantity,$minQuantity] = array_pad(array_map('trim', $row), 9, '');
+            if ($line === 1) {
+                $delimiter = substr_count($raw, ';') >= substr_count($raw, ',') ? ';' : ',';
+            }
+            $row = array_map('trim', str_getcsv($raw, $delimiter));
+            if (count($row) === 1 && $delimiter !== ',') $row = array_map('trim', str_getcsv($raw, ','));
+            if (!$row || implode('', $row) === '') continue;
+
+            if ($line === 1 && $this->looksLikeImportHeader($row)) {
+                $headerMap = $this->csvHeaderMap($row);
+                continue;
+            }
+
+            $values = $headerMap ? $this->csvValuesByHeader($row, $headerMap) : $this->csvValuesByPosition($row);
+            $name = $values['name'];
+            $designation = $values['designation'];
+            $unit = $values['unit'];
+            $price = $this->csvNumber($values['price']);
+            $warehouse = $values['warehouse'];
+            $section = $values['section'];
+            $location = $values['location'];
+            $quantity = $this->csvNumber($values['quantity']);
+            $minQuantity = $this->csvNumber($values['min_quantity']);
+
             if ($name === '') { $result['errors'][] = "Linha {$line}: nome em falta."; continue; }
-            $price = (float)str_replace(',', '.', $price ?: '0');
             $stmt = $this->db->prepare('SELECT id FROM items WHERE name = ? LIMIT 1');
             $stmt->execute([$name]);
             $id = $stmt->fetchColumn();
@@ -234,12 +280,64 @@ class Repository extends Model
                 $warehouseId = $this->findOrCreateWarehouse($warehouse, $section, $location);
                 if ($section !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Setor', $section, $section);
                 if ($location !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Posição', $location, $location);
-                $this->saveInventory(['item_id'=>$itemId,'warehouse_id'=>$warehouseId,'quantity'=>(float)str_replace(',', '.', $quantity ?: '0'),'min_quantity'=>(float)str_replace(',', '.', $minQuantity ?: '0')]);
+                $this->saveInventory(['item_id'=>$itemId,'warehouse_id'=>$warehouseId,'quantity'=>$quantity,'min_quantity'=>$minQuantity]);
                 $result['stocked']++;
             }
         }
         fclose($handle);
         return $result;
+    }
+
+    private function csvValuesByPosition(array $row): array
+    {
+        [$name,$designation,$unit,$price,$warehouse,$section,$location,$quantity,$minQuantity] = array_pad($row, 9, '');
+        return compact('name','designation','unit','price','warehouse','section','location','quantity','minQuantity') + ['min_quantity'=>$minQuantity];
+    }
+
+    private function csvValuesByHeader(array $row, array $headerMap): array
+    {
+        $get = fn(string $key): string => isset($headerMap[$key], $row[$headerMap[$key]]) ? trim((string)$row[$headerMap[$key]]) : '';
+        return ['name'=>$get('name'),'designation'=>$get('designation'),'unit'=>$get('unit'),'price'=>$get('price'),'warehouse'=>$get('warehouse'),'section'=>$get('section'),'location'=>$get('location'),'quantity'=>$get('quantity'),'min_quantity'=>$get('min_quantity')];
+    }
+
+    private function looksLikeImportHeader(array $row): bool
+    {
+        return (bool)array_filter($row, fn($cell) => in_array($this->normalizeCsvHeader($cell), ['nome','name','artigo','referencia','armazem','warehouse','quantidade','qtd'], true));
+    }
+
+    private function csvHeaderMap(array $headers): array
+    {
+        $aliases = [
+            'name'=>['nome','name','artigo','referencia','ref'],
+            'designation'=>['designacao','descricao','description','designation'],
+            'unit'=>['unidade','unit','un'],
+            'price'=>['preco','preco_ponderado','p_ponderado','weighted_price','price'],
+            'warehouse'=>['armazem','warehouse','deposito'],
+            'section'=>['setor','sector','section','seccao'],
+            'location'=>['localizacao','local','location','posicao'],
+            'quantity'=>['qtd','quantidade','quantity','stock'],
+            'min_quantity'=>['min','minimo','quantidade_minima','min_quantity'],
+        ];
+        $map = [];
+        foreach ($headers as $index => $header) {
+            $normalized = $this->normalizeCsvHeader($header);
+            foreach ($aliases as $field => $names) if (in_array($normalized, $names, true)) $map[$field] = $index;
+        }
+        return $map;
+    }
+
+    private function normalizeCsvHeader(string $header): string
+    {
+        $header = iconv('UTF-8', 'ASCII//TRANSLIT', $header) ?: $header;
+        return trim(preg_replace('/[^a-z0-9]+/', '_', strtolower($header)), '_');
+    }
+
+    private function csvNumber(string $value): float
+    {
+        $value = trim($value);
+        if ($value === '') return 0.0;
+        if (str_contains($value, ',') && str_contains($value, '.')) $value = str_replace('.', '', $value);
+        return (float)str_replace(',', '.', $value);
     }
 
     private function findOrCreateWarehouse(string $name, string $section = '', string $location = ''): int

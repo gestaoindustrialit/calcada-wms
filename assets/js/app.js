@@ -1,5 +1,52 @@
 document.addEventListener('DOMContentLoaded',()=>{
-  const bindSearchableSelect=select=>{if(select.dataset.searchBound)return;select.dataset.searchBound='1';select.addEventListener('keydown',e=>{const key=e.key.toLowerCase();if(key.length!==1)return;const opt=[...select.options].find(o=>o.text.toLowerCase().includes(key));if(opt)select.value=opt.value;});};
+  const enhanceSearchableSelect=select=>{
+    if(select.dataset.searchBound)return;
+    select.dataset.searchBound='1';
+    const wrapper=document.createElement('div');
+    wrapper.className='searchable-select-wrap';
+    const input=document.createElement('input');
+    input.type='search';
+    input.className='form-control searchable-select-input';
+    input.placeholder=select.dataset.searchPlaceholder||'Pesquisar';
+    input.autocomplete='off';
+    const list=document.createElement('div');
+    list.className='searchable-select-list';
+    const selected=select.options[select.selectedIndex];
+    input.value=selected?selected.text:'';
+    select.classList.add('searchable-select-native');
+    select.parentNode.insertBefore(wrapper,select);
+    wrapper.appendChild(select);
+    wrapper.appendChild(input);
+    wrapper.appendChild(list);
+    const options=()=>[...select.options].map(option=>({value:option.value,text:option.text,disabled:option.disabled}));
+    const close=()=>list.classList.remove('is-open');
+    const choose=option=>{select.value=option.value;input.value=option.text;select.dispatchEvent(new Event('change',{bubbles:true}));close();};
+    const render=()=>{
+      const term=input.value.toLowerCase().trim();
+      const matches=options().filter(option=>!option.disabled&&option.text.toLowerCase().includes(term)).slice(0,30);
+      list.innerHTML='';
+      matches.forEach(option=>{
+        const button=document.createElement('button');
+        button.type='button';
+        button.className='searchable-select-option';
+        button.textContent=option.text;
+        button.addEventListener('mousedown',event=>{event.preventDefault();choose(option);});
+        list.appendChild(button);
+      });
+      list.classList.toggle('is-open',matches.length>0&&document.activeElement===input);
+    };
+    input.addEventListener('focus',render);
+    input.addEventListener('input',render);
+    input.addEventListener('keydown',event=>{
+      if(event.key==='Enter'){
+        const first=list.querySelector('.searchable-select-option');
+        if(first){event.preventDefault();first.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));}
+      }
+      if(event.key==='Escape')close();
+    });
+    input.addEventListener('blur',()=>setTimeout(()=>{const current=select.options[select.selectedIndex];input.value=current?current.text:'';close();},120));
+  };
+  const bindSearchableSelect=enhanceSearchableSelect;
   document.querySelectorAll('[data-smart-form]').forEach(form=>form.addEventListener('submit',()=>{const btn=form.querySelector('button[type="submit"],button:not([type])');if(btn){btn.dataset.original=btn.textContent;btn.textContent='A guardar…';btn.disabled=true;}}));
   document.querySelectorAll('.searchable-select').forEach(bindSearchableSelect);
   document.querySelectorAll('[data-request-form]').forEach(form=>{
@@ -18,6 +65,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       const source=lines.querySelector('[data-request-line]');
       if(!source)return;
       const clone=source.cloneNode(true);
+      clone.querySelectorAll('.searchable-select-wrap').forEach(wrapper=>{const select=wrapper.querySelector('select');if(select)wrapper.replaceWith(select);});
       clone.querySelectorAll('input').forEach(input=>{input.value='';});
       clone.querySelectorAll('select').forEach(select=>{select.selectedIndex=0;delete select.dataset.searchBound;bindSearchableSelect(select);});
       lines.appendChild(clone);
