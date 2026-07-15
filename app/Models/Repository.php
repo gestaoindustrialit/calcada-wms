@@ -256,8 +256,7 @@ class Repository extends Model
             $unit = $values['unit'];
             $price = $this->csvNumber($values['price']);
             $warehouse = $values['warehouse'];
-            $section = $values['section'];
-            $location = $values['location'];
+            [$section, $location] = $this->normalizeImportLocation($values['section'], $values['location']);
             $quantity = $this->csvNumber($values['quantity']);
             $minQuantity = $this->csvNumber($values['min_quantity']);
 
@@ -275,7 +274,8 @@ class Repository extends Model
                 $itemId = (int)$this->db->lastInsertId();
                 $result['created']++;
             }
-            if ($withLocation) {
+            $hasLocationData = $warehouse !== '' || $section !== '' || $location !== '' || $values['quantity'] !== '' || $values['min_quantity'] !== '';
+            if ($withLocation || $hasLocationData) {
                 if ($warehouse === '') { $result['errors'][] = "Linha {$line}: armazém em falta."; continue; }
                 $warehouseId = $this->findOrCreateWarehouse($warehouse, $section, $location);
                 if ($section !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Setor', $section, $section);
@@ -338,6 +338,20 @@ class Repository extends Model
         if ($value === '') return 0.0;
         if (str_contains($value, ',') && str_contains($value, '.')) $value = str_replace('.', '', $value);
         return (float)str_replace(',', '.', $value);
+    }
+
+    private function normalizeImportLocation(string $section, string $location): array
+    {
+        $section = trim($section);
+        $location = trim($location);
+        if (str_contains($location, '|')) {
+            [$locationSection, $locationCode] = array_map('trim', explode('|', $location, 2));
+            if ($section === '' && !in_array($locationSection, ['', '-', '--'], true)) $section = $locationSection;
+            if ($locationCode !== '') $location = $locationCode;
+        }
+        if (in_array($section, ['-', '--'], true)) $section = '';
+        if (in_array($location, ['-', '--'], true)) $location = '';
+        return [$section, $location];
     }
 
     private function findOrCreateWarehouse(string $name, string $section = '', string $location = ''): int
