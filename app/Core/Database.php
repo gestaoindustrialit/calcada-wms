@@ -39,6 +39,7 @@ class Database
         self::ensureColumn('requests', 'delivered_quantity', 'REAL NOT NULL DEFAULT 0');
         self::ensureColumn('requests', 'request_group', 'TEXT');
         self::ensureColumn('inventory', 'location', "TEXT NOT NULL DEFAULT ''");
+        self::$pdo->exec("CREATE TABLE IF NOT EXISTS action_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, table_name TEXT NOT NULL, row_id INTEGER NOT NULL, action TEXT NOT NULL, before_data TEXT, after_data TEXT, user_name TEXT, user_role TEXT, note TEXT, reverted INTEGER NOT NULL DEFAULT 0, reverted_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
         self::$pdo->exec("CREATE TABLE IF NOT EXISTS warehouse_locations (id INTEGER PRIMARY KEY AUTOINCREMENT, warehouse_id INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'Setor', code TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(warehouse_id) REFERENCES warehouses(id))");
         if ((int) self::$pdo->query('SELECT COUNT(*) FROM warehouse_locations')->fetchColumn() === 0 && (int) self::$pdo->query('SELECT COUNT(*) FROM warehouses')->fetchColumn() > 0) {
             self::$pdo->exec("INSERT INTO warehouse_locations (warehouse_id,type,code,description) SELECT id,'Setor',section,location FROM warehouses");
