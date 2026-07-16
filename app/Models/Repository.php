@@ -235,14 +235,25 @@ class Repository extends Model
 
         $delimiter = ';';
         $headerMap = null;
+        $defaultWarehouse = $withLocation ? $this->singleWarehouseName() : null;
         $line = 0;
         while (($raw = fgets($handle)) !== false) {
             $line++;
+            $raw = $this->normalizeCsvEncoding($raw);
             if ($line === 1) {
-                $delimiter = substr_count($raw, ';') >= substr_count($raw, ',') ? ';' : ',';
+                $delimiter = $this->detectCsvDelimiter($raw);
             }
             $row = array_map('trim', str_getcsv($raw, $delimiter));
-            if (count($row) === 1 && $delimiter !== ',') $row = array_map('trim', str_getcsv($raw, ','));
+            if (count($row) === 1) {
+                foreach ([';', ',', "\t"] as $fallbackDelimiter) {
+                    if ($fallbackDelimiter === $delimiter) continue;
+                    $fallbackRow = array_map('trim', str_getcsv($raw, $fallbackDelimiter));
+                    if (count($fallbackRow) > count($row)) {
+                        $row = $fallbackRow;
+                        $delimiter = $fallbackDelimiter;
+                    }
+                }
+            }
             if (!$row || implode('', $row) === '') continue;
 
             if ($line === 1 && $this->looksLikeImportHeader($row)) {
@@ -257,6 +268,9 @@ class Repository extends Model
             $price = $this->csvNumber($values['price']);
             $warehouse = $values['warehouse'];
             [$section, $location] = $this->normalizeImportLocation($values['section'], $values['location']);
+            if ($warehouse === '' && $defaultWarehouse !== null) {
+                $warehouse = $defaultWarehouse;
+            }
             $quantity = $this->csvNumber($values['quantity']);
             $minQuantity = $this->csvNumber($values['min_quantity']);
 
@@ -276,7 +290,12 @@ class Repository extends Model
             }
             $hasLocationData = $warehouse !== '' || $section !== '' || $location !== '' || $values['quantity'] !== '' || $values['min_quantity'] !== '';
             if ($withLocation || $hasLocationData) {
-                if ($warehouse === '') { $result['errors'][] = "Linha {$line}: armazém em falta."; continue; }
+                if ($warehouse === '') {
+                    $result['errors'][] = $withLocation
+                        ? "Linha {$line}: armazém em falta; preencha a coluna armazém ou deixe apenas um armazém criado para ser usado por defeito."
+                        : "Linha {$line}: armazém em falta.";
+                    continue;
+                }
                 $warehouseId = $this->findOrCreateWarehouse($warehouse, $section, $location);
                 if ($section !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Setor', $section, $section);
                 if ($location !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Posição', $location, $location);
@@ -286,6 +305,35 @@ class Repository extends Model
         }
         fclose($handle);
         return $result;
+    }
+
+    private function normalizeCsvEncoding(string $line): string
+    {
+        if (str_starts_with($line, "\xEF\xBB\xBF")) {
+            $line = substr($line, 3);
+        }
+        if (mb_check_encoding($line, 'UTF-8')) {
+            return $line;
+        }
+        return mb_convert_encoding($line, 'UTF-8', 'Windows-1252, ISO-8859-1, UTF-8');
+    }
+
+    private function detectCsvDelimiter(string $line): string
+    {
+        $delimiters = [';' => 0, "\t" => 0, ',' => 0];
+        foreach ($delimiters as $delimiter => $_) {
+            $columns = str_getcsv($line, $delimiter);
+            $delimiters[$delimiter] = count($columns);
+        }
+        arsort($delimiters);
+        return (string)array_key_first($delimiters);
+    }
+
+    private function singleWarehouseName(): ?string
+    {
+        $stmt = $this->db->query('SELECT name FROM warehouses ORDER BY id ASC LIMIT 2');
+        $warehouses = $stmt->fetchAll();
+        return count($warehouses) === 1 ? (string)$warehouses[0]['name'] : null;
     }
 
     private function csvValuesByPosition(array $row): array
@@ -328,6 +376,7 @@ class Repository extends Model
 
     private function normalizeCsvHeader(string $header): string
     {
+        $header = $this->normalizeCsvEncoding($header);
         $header = iconv('UTF-8', 'ASCII//TRANSLIT', $header) ?: $header;
         return trim(preg_replace('/[^a-z0-9]+/', '_', strtolower($header)), '_');
     }
