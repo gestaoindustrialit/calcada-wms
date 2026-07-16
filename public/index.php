@@ -30,6 +30,8 @@ $routes = [
     'request_save'=>fn()=> $controller->saveRequest(),
     'request_action'=>fn()=> $controller->requestAction(),
     'reports'=>fn()=> $controller->reports(),
+    'logs'=>fn()=> $controller->logs(),
+    'log_action'=>fn()=> $controller->logAction(),
     'export_excel'=>fn()=> $controller->export('excel'),
     'export_pdf'=>fn()=> $controller->export('pdf'),
 ];

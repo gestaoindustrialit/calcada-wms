@@ -6,7 +6,7 @@ use App\Core\Model;
 
 class Repository extends Model
 {
-    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests'];
+    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','action_logs'];
 
     public function all(string $table): array
     {
@@ -29,21 +29,118 @@ class Repository extends Model
         $cols = array_keys($data);
         $sql = "INSERT INTO {$table} (" . implode(',', $cols) . ") VALUES (:" . implode(',:', $cols) . ")";
         $this->db->prepare($sql)->execute($data);
+        if ($table !== 'action_logs') {
+            $id = (int)$this->db->lastInsertId();
+            $this->logAction($table, $id, 'create', null, $this->find($table, $id));
+        }
     }
 
     public function update(string $table, int $id, array $data): void
     {
         $this->guardTable($table);
         if (!$data) return;
+        $before = $table !== 'action_logs' ? $this->find($table, $id) : null;
         $sets = implode(',', array_map(fn($col) => "{$col} = :{$col}", array_keys($data)));
         $data['id'] = $id;
         $this->db->prepare("UPDATE {$table} SET {$sets} WHERE id = :id")->execute($data);
+        if ($table !== 'action_logs') {
+            $this->logAction($table, $id, 'update', $before, $this->find($table, $id));
+        }
     }
 
     public function delete(string $table, int $id): void
     {
         $this->guardTable($table);
+        $before = $table !== 'action_logs' ? $this->find($table, $id) : null;
         $this->db->prepare("DELETE FROM {$table} WHERE id = ?")->execute([$id]);
+        if ($table !== 'action_logs') {
+            $this->logAction($table, $id, 'delete', $before, null);
+        }
+    }
+
+
+    public function actionLogs(array $filters = []): array
+    {
+        $where = [];
+        $params = [];
+        if (!empty($filters['table_name'])) { $where[] = 'table_name = :table_name'; $params['table_name'] = $filters['table_name']; }
+        if (!empty($filters['action'])) { $where[] = 'action = :action'; $params['action'] = $filters['action']; }
+        $sql = 'SELECT * FROM action_logs' . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY created_at DESC, id DESC LIMIT 300';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public function actionLog(int $id): ?array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM action_logs WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public function updateActionLog(int $id, string $note): void
+    {
+        $this->db->prepare('UPDATE action_logs SET note = :note WHERE id = :id')->execute(['note'=>$note, 'id'=>$id]);
+    }
+
+    public function revertActionLog(int $id): bool
+    {
+        $log = $this->actionLog($id);
+        if (!$log || (int)$log['reverted'] === 1) return false;
+        $table = (string)$log['table_name'];
+        $this->guardTable($table);
+        if ($table === 'action_logs') return false;
+        $rowId = (int)$log['row_id'];
+        $before = $log['before_data'] ? json_decode($log['before_data'], true) : null;
+        $this->db->beginTransaction();
+        try {
+            if ($log['action'] === 'create') {
+                $this->db->prepare("DELETE FROM {$table} WHERE id = ?")->execute([$rowId]);
+            } elseif ($log['action'] === 'delete' && is_array($before)) {
+                $this->restoreRow($table, $before);
+            } elseif ($log['action'] === 'update' && is_array($before)) {
+                $this->restoreRow($table, $before);
+            } else {
+                $this->db->rollBack();
+                return false;
+            }
+            $this->db->prepare('UPDATE action_logs SET reverted = 1, reverted_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([$id]);
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    private function restoreRow(string $table, array $row): void
+    {
+        $this->guardTable($table);
+        $cols = array_keys($row);
+        $sets = implode(',', array_map(fn($col) => "{$col} = :{$col}", $cols));
+        $exists = $this->find($table, (int)$row['id']);
+        if ($exists) {
+            $this->db->prepare("UPDATE {$table} SET {$sets} WHERE id = :id")->execute($row);
+            return;
+        }
+        $sql = "INSERT INTO {$table} (" . implode(',', $cols) . ") VALUES (:" . implode(',:', $cols) . ")";
+        $this->db->prepare($sql)->execute($row);
+    }
+
+    private function logAction(string $table, int $rowId, string $action, ?array $before, ?array $after): void
+    {
+        if (!$before && !$after) return;
+        $user = Auth::user();
+        $this->db->prepare('INSERT INTO action_logs (table_name,row_id,action,before_data,after_data,user_name,user_role) VALUES (:table_name,:row_id,:action,:before_data,:after_data,:user_name,:user_role)')->execute([
+            'table_name'=>$table,
+            'row_id'=>$rowId,
+            'action'=>$action,
+            'before_data'=>$before ? json_encode($before, JSON_UNESCAPED_UNICODE) : null,
+            'after_data'=>$after ? json_encode($after, JSON_UNESCAPED_UNICODE) : null,
+            'user_name'=>$user['name'] ?? 'Sistema',
+            'user_role'=>$user['role'] ?? '',
+        ]);
     }
 
     public function userByLogin(string $login): ?array
@@ -99,6 +196,7 @@ class Repository extends Model
         $stmt->execute([(int)$data['item_id'], (int)$data['warehouse_id'], $data['location']]);
         $existing = $stmt->fetch();
         if ($existing) {
+            $before = $this->find('inventory', (int)$existing['id']);
             if ($movementType === 'set') {
                 $this->db->prepare('UPDATE inventory SET quantity = MAX(:quantity, 0), min_quantity = :min_quantity WHERE id = :id')->execute([
                     'quantity'=>(float)$data['quantity'], 'min_quantity'=>(float)$data['min_quantity'], 'id'=>(int)$existing['id'],
@@ -108,6 +206,7 @@ class Repository extends Model
                     'quantity'=>(float)$data['quantity'], 'min_quantity'=>(float)$data['min_quantity'], 'id'=>(int)$existing['id'],
                 ]);
             }
+            $this->logAction('inventory', (int)$existing['id'], 'update', $before, $this->find('inventory', (int)$existing['id']));
             return;
         }
         $data['quantity'] = max((float)$data['quantity'], 0);
@@ -116,6 +215,7 @@ class Repository extends Model
 
     public function setInventoryRow(int $id, array $data): void
     {
+        $before = $this->find('inventory', $id);
         $data['location'] = trim((string)($data['location'] ?? ''));
         $this->db->prepare('UPDATE inventory SET item_id = :item_id, warehouse_id = :warehouse_id, location = :location, quantity = MAX(:quantity, 0), min_quantity = :min_quantity WHERE id = :id')->execute([
             'item_id'=>(int)$data['item_id'],
@@ -125,12 +225,18 @@ class Repository extends Model
             'min_quantity'=>(float)$data['min_quantity'],
             'id'=>$id,
         ]);
+        $this->logAction('inventory', $id, 'update', $before, $this->find('inventory', $id));
     }
 
     public function adjustInventory(int $itemId, int $warehouseId, float $quantity, string $location = ''): void
     {
+        $location = trim($location);
+        $select = $this->db->prepare('SELECT * FROM inventory WHERE item_id = ? AND warehouse_id = ? AND location = ? LIMIT 1');
+        $select->execute([$itemId, $warehouseId, $location]);
+        $before = $select->fetch() ?: null;
         $stmt = $this->db->prepare('UPDATE inventory SET quantity = MAX(quantity + :quantity, 0) WHERE item_id = :item_id AND warehouse_id = :warehouse_id AND location = :location');
-        $stmt->execute(['quantity'=>$quantity, 'item_id'=>$itemId, 'warehouse_id'=>$warehouseId, 'location'=>trim($location)]);
+        $stmt->execute(['quantity'=>$quantity, 'item_id'=>$itemId, 'warehouse_id'=>$warehouseId, 'location'=>$location]);
+        if ($before) $this->logAction('inventory', (int)$before['id'], 'update', $before, $this->find('inventory', (int)$before['id']));
     }
 
     public function splitInventory(int $itemId, int $warehouseId, string $fromLocation, string $toLocation, float $quantity, float $minQuantity = 0): void
@@ -234,7 +340,9 @@ class Repository extends Model
         if ($delivered <= 0) return;
         $newDelivered = (float)$request['delivered_quantity'] + $delivered;
         $status = $newDelivered >= (float)$request['quantity'] ? 'Entregue' : 'Parcial';
+        $before = $request;
         $this->db->prepare('UPDATE requests SET delivered_quantity = :delivered, status = :status WHERE id = :id')->execute(['delivered'=>$newDelivered,'status'=>$status,'id'=>$id]);
+        $this->logAction('requests', $id, 'update', $before, $this->find('requests', $id));
         if (!empty($request['warehouse_id'])) $this->adjustInventory((int)$request['item_id'], (int)$request['warehouse_id'], -$delivered);
     }
 
@@ -242,10 +350,12 @@ class Repository extends Model
     {
         $request = $this->find('requests', $id);
         if ($request && !empty($request['request_group'])) {
-            $this->db->prepare('UPDATE requests SET status = ? WHERE request_group = ?')->execute([$status, $request['request_group']]);
+            foreach ($this->requestGroupLines($id) as $line) { $before = $line; $this->db->prepare('UPDATE requests SET status = ? WHERE id = ?')->execute([$status, $line['id']]); $this->logAction('requests', (int)$line['id'], 'update', $before, $this->find('requests', (int)$line['id'])); }
             return;
         }
+        $before = $request;
         $this->db->prepare('UPDATE requests SET status = ? WHERE id = ?')->execute([$status, $id]);
+        $this->logAction('requests', $id, 'update', $before, $this->find('requests', $id));
     }
 
     public function deleteRequestGroup(int $id): void
@@ -253,7 +363,9 @@ class Repository extends Model
         $request = $this->find('requests', $id);
         if (!$request) return;
         if (!empty($request['request_group'])) {
-            $this->db->prepare('DELETE FROM requests WHERE request_group = ?')->execute([$request['request_group']]);
+            foreach ($this->requestGroupLines($id) as $line) {
+                $this->delete('requests', (int)$line['id']);
+            }
             return;
         }
         $this->delete('requests', $id);

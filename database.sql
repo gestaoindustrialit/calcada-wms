@@ -55,3 +55,18 @@ CREATE TABLE IF NOT EXISTS requests (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(item_id) REFERENCES items(id)
 );
+
+CREATE TABLE IF NOT EXISTS action_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_name TEXT NOT NULL,
+    row_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    before_data TEXT,
+    after_data TEXT,
+    user_name TEXT,
+    user_role TEXT,
+    note TEXT,
+    reverted INTEGER NOT NULL DEFAULT 0,
+    reverted_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

@@ -94,6 +94,28 @@ class AppController extends Controller
         $sort = $_GET['sort'] ?? 'recent';
         $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user, $sort),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$edit, 'editLines'=>$editLines, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests, 'sort'=>$sort]);
     }
+
+    public function logs(): void
+    {
+        $this->ensureAdminAllowed();
+        $filters = array_intersect_key($_GET, array_flip(['table_name','action']));
+        $this->view('logs/index', ['title'=>'Logs de ações', 'rows'=>$this->repo->actionLogs($filters), 'filters'=>$filters, 'tables'=>['users','warehouses','warehouse_locations','items','inventory','requests'], 'actions'=>['create','update','delete']]);
+    }
+
+    public function logAction(): void
+    {
+        $this->ensureAdminAllowed();
+        $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
+        $action = $_POST['log_action'] ?? ($_GET['do'] ?? '');
+        if ($id > 0 && $action === 'save_note') {
+            $this->repo->updateActionLog($id, trim((string)($_POST['note'] ?? '')));
+            $_SESSION['flash'] = 'Nota do log atualizada.';
+        } elseif ($id > 0 && $action === 'revert') {
+            $_SESSION['flash'] = $this->repo->revertActionLog($id) ? 'Modificação anulada com sucesso.' : 'Não foi possível anular esta modificação.';
+        }
+        $this->redirect(Url::page('logs'));
+    }
+
     public function reports(): void { $user = Auth::user(); $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam($user), 'currentUser'=>$user]); }
     private function crud(string $table, array $fields, string $view, string $title, array $extraData = []): void
     {
