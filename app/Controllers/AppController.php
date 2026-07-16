@@ -80,7 +80,7 @@ class AppController extends Controller
         }
         $filters = array_intersect_key($_GET, array_flip(['q','item_id','warehouse_id','stock_status']));
         $rows = $this->repo->inventory($filters);
-        $this->view('inventory/index', ['title'=>'Inventário','rows'=>$rows,'summary'=>$this->repo->inventorySummary($rows),'filters'=>$filters,'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$this->editRow('inventory'), 'locations'=>$this->repo->warehouseLocations()]);
+        $this->view('inventory/index', ['title'=>'Inventário','rows'=>$rows,'summary'=>$this->repo->inventorySummary($rows),'filters'=>$filters,'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$this->editRow('inventory'), 'locations'=>$this->repo->warehouseLocations(), 'inventoryRows'=>$this->repo->inventory()]);
     }
     public function requests(): void
     {
@@ -117,6 +117,10 @@ class AppController extends Controller
     {
         $this->ensureChiefAllowed();
         $data = array_intersect_key($_POST, array_flip(['item_id','warehouse_id','location','quantity','min_quantity']));
+        if (($_POST['movement_type'] ?? '') === 'split' && empty($_POST['id'])) {
+            $this->repo->splitInventory((int)$_POST['item_id'], (int)$_POST['warehouse_id'], (string)($_POST['source_location'] ?? ''), (string)($_POST['location'] ?? ''), (float)($_POST['quantity'] ?? 0), (float)($_POST['min_quantity'] ?? 0));
+            $this->redirect(Url::page('inventory'));
+        }
         if (!empty($_POST['id'])) {
             $this->repo->setInventoryRow((int)$_POST['id'], $data);
         } else {
