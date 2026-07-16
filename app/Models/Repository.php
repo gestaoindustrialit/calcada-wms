@@ -94,9 +94,8 @@ class Repository extends Model
         $quantity = abs((float)($data['quantity'] ?? 0));
         $delta = $movementType === 'out' ? -$quantity : $quantity;
         $data['quantity'] = $movementType === 'set' ? (float)($data['quantity'] ?? 0) : $delta;
-        $data['location'] = trim((string)($data['location'] ?? ''));
-        $stmt = $this->db->prepare('SELECT id, quantity FROM inventory WHERE item_id = ? AND warehouse_id = ? AND location = ?');
-        $stmt->execute([(int)$data['item_id'], (int)$data['warehouse_id'], $data['location']]);
+        $stmt = $this->db->prepare('SELECT id, quantity FROM inventory WHERE item_id = ? AND warehouse_id = ?');
+        $stmt->execute([(int)$data['item_id'], (int)$data['warehouse_id']]);
         $existing = $stmt->fetch();
         if ($existing) {
             if ($movementType === 'set') {
@@ -114,23 +113,10 @@ class Repository extends Model
         $this->insert('inventory', $data);
     }
 
-    public function setInventoryRow(int $id, array $data): void
+    public function adjustInventory(int $itemId, int $warehouseId, float $quantity): void
     {
-        $data['location'] = trim((string)($data['location'] ?? ''));
-        $this->db->prepare('UPDATE inventory SET item_id = :item_id, warehouse_id = :warehouse_id, location = :location, quantity = MAX(:quantity, 0), min_quantity = :min_quantity WHERE id = :id')->execute([
-            'item_id'=>(int)$data['item_id'],
-            'warehouse_id'=>(int)$data['warehouse_id'],
-            'location'=>$data['location'],
-            'quantity'=>(float)$data['quantity'],
-            'min_quantity'=>(float)$data['min_quantity'],
-            'id'=>$id,
-        ]);
-    }
-
-    public function adjustInventory(int $itemId, int $warehouseId, float $quantity, string $location = ''): void
-    {
-        $stmt = $this->db->prepare('UPDATE inventory SET quantity = MAX(quantity + :quantity, 0) WHERE item_id = :item_id AND warehouse_id = :warehouse_id AND location = :location');
-        $stmt->execute(['quantity'=>$quantity, 'item_id'=>$itemId, 'warehouse_id'=>$warehouseId, 'location'=>trim($location)]);
+        $stmt = $this->db->prepare('UPDATE inventory SET quantity = MAX(quantity + :quantity, 0) WHERE item_id = :item_id AND warehouse_id = :warehouse_id');
+        $stmt->execute(['quantity'=>$quantity, 'item_id'=>$itemId, 'warehouse_id'=>$warehouseId]);
     }
 
     public function inventory(array $filters = []): array
@@ -142,14 +128,14 @@ class Repository extends Model
         if (($filters['stock_status'] ?? '') === 'low') $where[] = 'inventory.quantity <= inventory.min_quantity';
         if (($filters['stock_status'] ?? '') === 'available') $where[] = 'inventory.quantity > inventory.min_quantity';
         if (($filters['q'] ?? '') !== '') {
-            $where[] = '(items.name LIKE :q OR items.designation LIKE :q OR warehouses.name LIKE :q OR warehouses.section LIKE :q OR warehouses.location LIKE :q OR inventory.location LIKE :q)';
+            $where[] = '(items.name LIKE :q OR items.designation LIKE :q OR warehouses.name LIKE :q OR warehouses.section LIKE :q OR warehouses.location LIKE :q)';
             $params['q'] = '%' . trim((string)$filters['q']) . '%';
         }
-        $sql = "SELECT inventory.*, items.name AS item, items.designation, items.unit, items.weighted_price, warehouses.name AS warehouse, warehouses.section, COALESCE(NULLIF(inventory.location, ''), warehouses.location) AS location,
+        $sql = "SELECT inventory.*, items.name AS item, items.designation, items.unit, items.weighted_price, warehouses.name AS warehouse, warehouses.section, warehouses.location,
             (inventory.quantity * items.weighted_price) AS stock_value
             FROM inventory JOIN items ON items.id=inventory.item_id JOIN warehouses ON warehouses.id=inventory.warehouse_id";
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
-        $sql .= ' ORDER BY items.name ASC, warehouses.name ASC, location ASC';
+        $sql .= ' ORDER BY items.name ASC, warehouses.name ASC';
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
@@ -313,7 +299,7 @@ class Repository extends Model
                 $warehouseId = $this->findOrCreateWarehouse($warehouse, $section, $location);
                 if ($section !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Setor', $section, $section);
                 if ($location !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Posição', $location, $location);
-                $this->saveInventory(['item_id'=>$itemId,'warehouse_id'=>$warehouseId,'location'=>$location,'quantity'=>$quantity,'min_quantity'=>$minQuantity]);
+                $this->saveInventory(['item_id'=>$itemId,'warehouse_id'=>$warehouseId,'quantity'=>$quantity,'min_quantity'=>$minQuantity], 'set');
                 $result['stocked']++;
             }
         }
@@ -390,9 +376,27 @@ class Repository extends Model
 
     private function normalizeCsvHeader(string $header): string
     {
-        $header = $this->normalizeCsvEncoding($header);
-        $header = iconv('UTF-8', 'ASCII//TRANSLIT', $header) ?: $header;
-        return trim(preg_replace('/[^a-z0-9]+/', '_', strtolower($header)), '_');
+        $header = trim($this->normalizeCsvEncoding($header));
+
+        // Não depender do comportamento de transliteração do iconv/locale do servidor.
+        // Garante que cabeçalhos como armazém, designação, preço e localização
+        // são sempre convertidos para armazem, designacao, preco e localizacao.
+        $header = strtr($header, [
+            'Á'=>'A','À'=>'A','Â'=>'A','Ã'=>'A','Ä'=>'A',
+            'É'=>'E','È'=>'E','Ê'=>'E','Ë'=>'E',
+            'Í'=>'I','Ì'=>'I','Î'=>'I','Ï'=>'I',
+            'Ó'=>'O','Ò'=>'O','Ô'=>'O','Õ'=>'O','Ö'=>'O',
+            'Ú'=>'U','Ù'=>'U','Û'=>'U','Ü'=>'U',
+            'Ç'=>'C','Ñ'=>'N',
+            'á'=>'a','à'=>'a','â'=>'a','ã'=>'a','ä'=>'a',
+            'é'=>'e','è'=>'e','ê'=>'e','ë'=>'e',
+            'í'=>'i','ì'=>'i','î'=>'i','ï'=>'i',
+            'ó'=>'o','ò'=>'o','ô'=>'o','õ'=>'o','ö'=>'o',
+            'ú'=>'u','ù'=>'u','û'=>'u','ü'=>'u',
+            'ç'=>'c','ñ'=>'n',
+        ]);
+
+        return trim((string)preg_replace('/[^a-z0-9]+/', '_', strtolower($header)), '_');
     }
 
     private function csvNumber(string $value): float
