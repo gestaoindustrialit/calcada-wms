@@ -38,6 +38,7 @@ class Database
         self::ensureColumn('users', 'password_hash', 'TEXT');
         self::ensureColumn('requests', 'delivered_quantity', 'REAL NOT NULL DEFAULT 0');
         self::ensureColumn('requests', 'request_group', 'TEXT');
+        self::ensureColumn('inventory', 'location', "TEXT NOT NULL DEFAULT ''");
         self::$pdo->exec("CREATE TABLE IF NOT EXISTS warehouse_locations (id INTEGER PRIMARY KEY AUTOINCREMENT, warehouse_id INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'Setor', code TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(warehouse_id) REFERENCES warehouses(id))");
         if ((int) self::$pdo->query('SELECT COUNT(*) FROM warehouse_locations')->fetchColumn() === 0 && (int) self::$pdo->query('SELECT COUNT(*) FROM warehouses')->fetchColumn() > 0) {
             self::$pdo->exec("INSERT INTO warehouse_locations (warehouse_id,type,code,description) SELECT id,'Setor',section,location FROM warehouses");
@@ -58,8 +59,8 @@ class Database
                 ('Parafuso M8','Fixação zincada','un',0.18),
                 ('Tinta branca','Balde 15L','lt',4.75),
                 ('Luvas nitrilo','Caixa 100 unidades','cx',8.90)");
-            self::$pdo->exec("INSERT INTO inventory (item_id,warehouse_id,quantity,min_quantity) VALUES
-                (1,1,2500,500),(2,2,80,20),(3,1,120,30)");
+            self::$pdo->exec("INSERT INTO inventory (item_id,warehouse_id,location,quantity,min_quantity) VALUES
+                (1,1,'A-01',2500,500),(2,2,'B',80,20),(3,1,'A',120,30)");
             self::$pdo->exec("INSERT INTO requests (requester,team,item_id,warehouse_id,quantity,status,notes,created_at) VALUES
                 ('Miguel','Manutenção',1,1,200,'Aprovado','Reposição preventiva',date('now','-2 months')),
                 ('Rita','Produção',2,2,10,'Pendente','Linha 3',date('now','-1 month')),

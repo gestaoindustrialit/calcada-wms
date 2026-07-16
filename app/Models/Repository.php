@@ -94,8 +94,9 @@ class Repository extends Model
         $quantity = abs((float)($data['quantity'] ?? 0));
         $delta = $movementType === 'out' ? -$quantity : $quantity;
         $data['quantity'] = $movementType === 'set' ? (float)($data['quantity'] ?? 0) : $delta;
-        $stmt = $this->db->prepare('SELECT id, quantity FROM inventory WHERE item_id = ? AND warehouse_id = ?');
-        $stmt->execute([(int)$data['item_id'], (int)$data['warehouse_id']]);
+        $data['location'] = trim((string)($data['location'] ?? ''));
+        $stmt = $this->db->prepare('SELECT id, quantity FROM inventory WHERE item_id = ? AND warehouse_id = ? AND location = ?');
+        $stmt->execute([(int)$data['item_id'], (int)$data['warehouse_id'], $data['location']]);
         $existing = $stmt->fetch();
         if ($existing) {
             if ($movementType === 'set') {
@@ -113,10 +114,23 @@ class Repository extends Model
         $this->insert('inventory', $data);
     }
 
-    public function adjustInventory(int $itemId, int $warehouseId, float $quantity): void
+    public function setInventoryRow(int $id, array $data): void
     {
-        $stmt = $this->db->prepare('UPDATE inventory SET quantity = MAX(quantity + :quantity, 0) WHERE item_id = :item_id AND warehouse_id = :warehouse_id');
-        $stmt->execute(['quantity'=>$quantity, 'item_id'=>$itemId, 'warehouse_id'=>$warehouseId]);
+        $data['location'] = trim((string)($data['location'] ?? ''));
+        $this->db->prepare('UPDATE inventory SET item_id = :item_id, warehouse_id = :warehouse_id, location = :location, quantity = MAX(:quantity, 0), min_quantity = :min_quantity WHERE id = :id')->execute([
+            'item_id'=>(int)$data['item_id'],
+            'warehouse_id'=>(int)$data['warehouse_id'],
+            'location'=>$data['location'],
+            'quantity'=>(float)$data['quantity'],
+            'min_quantity'=>(float)$data['min_quantity'],
+            'id'=>$id,
+        ]);
+    }
+
+    public function adjustInventory(int $itemId, int $warehouseId, float $quantity, string $location = ''): void
+    {
+        $stmt = $this->db->prepare('UPDATE inventory SET quantity = MAX(quantity + :quantity, 0) WHERE item_id = :item_id AND warehouse_id = :warehouse_id AND location = :location');
+        $stmt->execute(['quantity'=>$quantity, 'item_id'=>$itemId, 'warehouse_id'=>$warehouseId, 'location'=>trim($location)]);
     }
 
     public function inventory(array $filters = []): array
@@ -128,14 +142,14 @@ class Repository extends Model
         if (($filters['stock_status'] ?? '') === 'low') $where[] = 'inventory.quantity <= inventory.min_quantity';
         if (($filters['stock_status'] ?? '') === 'available') $where[] = 'inventory.quantity > inventory.min_quantity';
         if (($filters['q'] ?? '') !== '') {
-            $where[] = '(items.name LIKE :q OR items.designation LIKE :q OR warehouses.name LIKE :q OR warehouses.section LIKE :q OR warehouses.location LIKE :q)';
+            $where[] = '(items.name LIKE :q OR items.designation LIKE :q OR warehouses.name LIKE :q OR warehouses.section LIKE :q OR warehouses.location LIKE :q OR inventory.location LIKE :q)';
             $params['q'] = '%' . trim((string)$filters['q']) . '%';
         }
-        $sql = "SELECT inventory.*, items.name AS item, items.designation, items.unit, items.weighted_price, warehouses.name AS warehouse, warehouses.section, warehouses.location,
+        $sql = "SELECT inventory.*, items.name AS item, items.designation, items.unit, items.weighted_price, warehouses.name AS warehouse, warehouses.section, COALESCE(NULLIF(inventory.location, ''), warehouses.location) AS location,
             (inventory.quantity * items.weighted_price) AS stock_value
             FROM inventory JOIN items ON items.id=inventory.item_id JOIN warehouses ON warehouses.id=inventory.warehouse_id";
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
-        $sql .= ' ORDER BY items.name ASC, warehouses.name ASC';
+        $sql .= ' ORDER BY items.name ASC, warehouses.name ASC, location ASC';
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
@@ -299,7 +313,7 @@ class Repository extends Model
                 $warehouseId = $this->findOrCreateWarehouse($warehouse, $section, $location);
                 if ($section !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Setor', $section, $section);
                 if ($location !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Posição', $location, $location);
-                $this->saveInventory(['item_id'=>$itemId,'warehouse_id'=>$warehouseId,'quantity'=>$quantity,'min_quantity'=>$minQuantity]);
+                $this->saveInventory(['item_id'=>$itemId,'warehouse_id'=>$warehouseId,'location'=>$location,'quantity'=>$quantity,'min_quantity'=>$minQuantity]);
                 $result['stocked']++;
             }
         }
