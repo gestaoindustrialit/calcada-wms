@@ -18,12 +18,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     wrapper.appendChild(select);
     wrapper.appendChild(input);
     wrapper.appendChild(list);
-    const options=()=>[...select.options].map(option=>({value:option.value,text:option.text,disabled:option.disabled}));
+    const options=()=>[...select.options].map(option=>({value:option.value,text:option.text,search:[option.text,option.dataset.search||''].join(' '),disabled:option.disabled}));
     const close=()=>list.classList.remove('is-open');
     const choose=option=>{select.value=option.value;input.value=option.text;select.dispatchEvent(new Event('change',{bubbles:true}));close();};
     const render=()=>{
       const term=input.value.toLowerCase().trim();
-      const matches=options().filter(option=>!option.disabled&&option.text.toLowerCase().includes(term)).slice(0,30);
+      const matches=options().filter(option=>!option.disabled&&option.search.toLowerCase().includes(term)).slice(0,30);
       list.innerHTML='';
       matches.forEach(option=>{
         const button=document.createElement('button');
@@ -82,7 +82,11 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   document.querySelectorAll('[data-inventory-movement-form]').forEach(form=>{
     let stock=[];
+    let warehouseLocations=[];
+    let warehouseFallbacks=[];
     try{stock=JSON.parse(form.dataset.inventoryLocations||'[]');}catch(e){stock=[];}
+    try{warehouseLocations=JSON.parse(form.dataset.warehouseLocations||'[]');}catch(e){warehouseLocations=[];}
+    try{warehouseFallbacks=JSON.parse(form.dataset.warehouseFallbacks||'[]');}catch(e){warehouseFallbacks=[];}
     const item=form.querySelector('[name="item_id"]');
     const warehouse=form.querySelector('[name="warehouse_id"]');
     const movement=form.querySelector('[name="movement_type"]');
@@ -98,6 +102,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     };
     const stockForItem=()=>stock.find(row=>String(row.item_id)===String(item?.value||'')&&row.location)||null;
     const currentStock=()=>stock.find(row=>String(row.item_id)===String(item?.value||'')&&String(row.warehouse_id)===String(warehouse?.value||'')&&row.location)||null;
+    const warehouseDefaultLocation=()=>{
+      const selectedWarehouse=String(warehouse?.value||'');
+      const listed=warehouseLocations.find(row=>String(row.warehouse_id)===selectedWarehouse&&row.location);
+      if(listed)return {warehouse_id:selectedWarehouse,location:listed.location};
+      const fallback=warehouseFallbacks.find(row=>String(row.warehouse_id)===selectedWarehouse&&row.location);
+      return fallback?{warehouse_id:selectedWarehouse,location:fallback.location}:null;
+    };
     const isSplit=()=>movement&&movement.value==='split';
     const applyStockRow=row=>{
       if(!row)return;
@@ -105,14 +116,14 @@ document.addEventListener('DOMContentLoaded',()=>{
       if(!isSplit()&&location)location.value=row.location||'';
       if(minQuantity&&!minQuantity.value)minQuantity.value=row.min_quantity??'';
     };
-    const fillDefaultLocation=()=>applyStockRow(currentStock());
+    const fillDefaultLocation=()=>applyStockRow(currentStock()||warehouseDefaultLocation());
     const fillDefaultArticleLocation=()=>{
       const row=stockForItem();
       if(row&&warehouse&&String(warehouse.value)!==String(row.warehouse_id)){
         warehouse.value=String(row.warehouse_id);
         syncSearchableInput(warehouse);
       }
-      applyStockRow(row||currentStock());
+      applyStockRow(row||currentStock()||warehouseDefaultLocation());
     };
     const refreshMovement=()=>{
       if(quantity)quantity.placeholder=isSplit()?'Qtd a dividir':(movement&&movement.value==='out'?'Quantidade a sair':'Quantidade');
