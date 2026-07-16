@@ -240,10 +240,19 @@ class Repository extends Model
         while (($raw = fgets($handle)) !== false) {
             $line++;
             if ($line === 1) {
-                $delimiter = substr_count($raw, ';') >= substr_count($raw, ',') ? ';' : ',';
+                $delimiter = $this->detectCsvDelimiter($raw);
             }
             $row = array_map('trim', str_getcsv($raw, $delimiter));
-            if (count($row) === 1 && $delimiter !== ',') $row = array_map('trim', str_getcsv($raw, ','));
+            if (count($row) === 1) {
+                foreach ([';', ',', "\t"] as $fallbackDelimiter) {
+                    if ($fallbackDelimiter === $delimiter) continue;
+                    $fallbackRow = array_map('trim', str_getcsv($raw, $fallbackDelimiter));
+                    if (count($fallbackRow) > count($row)) {
+                        $row = $fallbackRow;
+                        $delimiter = $fallbackDelimiter;
+                    }
+                }
+            }
             if (!$row || implode('', $row) === '') continue;
 
             if ($line === 1 && $this->looksLikeImportHeader($row)) {
@@ -297,6 +306,17 @@ class Repository extends Model
         return $result;
     }
 
+
+    private function detectCsvDelimiter(string $line): string
+    {
+        $delimiters = [';' => 0, "\t" => 0, ',' => 0];
+        foreach ($delimiters as $delimiter => $_) {
+            $columns = str_getcsv($line, $delimiter);
+            $delimiters[$delimiter] = count($columns);
+        }
+        arsort($delimiters);
+        return (string)array_key_first($delimiters);
+    }
 
     private function singleWarehouseName(): ?string
     {
