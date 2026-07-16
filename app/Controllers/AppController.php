@@ -118,6 +118,36 @@ class AppController extends Controller
     }
 
     public function reports(): void { $user = Auth::user(); $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam($user), 'currentUser'=>$user]); }
+
+    public function material(): void
+    {
+        $user = Auth::user();
+        $viewMode = ($_GET['view'] ?? 'pending') === 'completed' ? 'completed' : 'pending';
+        $this->view('material/index', ['title'=>'Material', 'rows'=>$this->repo->materialRequests($viewMode), 'viewMode'=>$viewMode, 'currentUser'=>$user, 'canManageMaterial'=>$this->canManageMaterial($user)]);
+    }
+
+    public function saveMaterial(): void
+    {
+        $user = Auth::user();
+        $data = array_intersect_key($_POST, array_flip(['responsible','department','product','operation','quantity','urgency','due_date','notes']));
+        $data['requester_name'] = $user['name'] ?? '';
+        $data['requester_team'] = $user['team'] ?? '';
+        $data['status'] = 'A Aguardar';
+        $data['completed_quantity'] = 0;
+        $data['attachment_name'] = isset($_FILES['attachment']) && ($_FILES['attachment']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK ? basename((string)$_FILES['attachment']['name']) : null;
+        $this->repo->insert('material_requests', $data);
+        $this->redirect(Url::page('material'));
+    }
+
+    public function materialStatus(): void
+    {
+        if (!$this->canManageMaterial(Auth::user())) {
+            $this->redirect(Url::page('material'));
+        }
+        $this->repo->setMaterialRequestStatus((int)($_POST['id'] ?? 0), (string)($_POST['status'] ?? 'A Aguardar'), (float)($_POST['completed_quantity'] ?? 0));
+        $this->redirect(Url::page('material') . (($_POST['status'] ?? '') === 'Concluído' ? '&view=completed' : ''));
+    }
+
     private function crud(string $table, array $fields, string $view, string $title, array $extraData = []): void
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -234,6 +264,13 @@ class AppController extends Controller
     {
         $role = strtolower((string)($user['role'] ?? ''));
         return in_array($role, ['admin', 'compras'], true);
+    }
+
+    private function canManageMaterial(?array $user = null): bool
+    {
+        $role = strtolower((string)($user['role'] ?? ''));
+        $team = strtolower((string)($user['team'] ?? ''));
+        return $role === 'admin' || str_contains($team, 'tornearia') || str_contains($team, 'desenho técnico') || str_contains($team, 'desenho tecnico');
     }
 
     private function ensureChiefAllowed(): void

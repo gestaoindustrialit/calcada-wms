@@ -6,7 +6,7 @@ use App\Core\Model;
 
 class Repository extends Model
 {
-    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','action_logs'];
+    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','action_logs'];
 
     public function all(string $table): array
     {
@@ -404,6 +404,28 @@ class Repository extends Model
             return;
         }
         $this->delete('requests', $id);
+    }
+
+    public function materialRequests(string $view = 'pending'): array
+    {
+        $completed = $view === 'completed';
+        $operator = $completed ? '=' : '!=';
+        $stmt = $this->db->prepare("SELECT * FROM material_requests WHERE status {$operator} 'Concluído' ORDER BY due_date ASC, urgency DESC, created_at DESC");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function setMaterialRequestStatus(int $id, string $status, float $completedQuantity): void
+    {
+        $request = $this->find('material_requests', $id);
+        if (!$request) return;
+        $before = $request;
+        $this->db->prepare('UPDATE material_requests SET status = :status, completed_quantity = :completed_quantity WHERE id = :id')->execute([
+            'status'=>$status,
+            'completed_quantity'=>max($completedQuantity, 0),
+            'id'=>$id,
+        ]);
+        $this->logAction('material_requests', $id, 'update', $before, $this->find('material_requests', $id));
     }
 
     public function importItems(array $file, bool $withLocation = false): array
