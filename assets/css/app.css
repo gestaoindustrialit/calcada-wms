@@ -279,3 +279,11 @@ body.modal-open .page-card { backdrop-filter: none; }
 .searchable-select-option { width: 100%; border: 0; border-radius: 12px; background: transparent; padding: .62rem .75rem; text-align: left; font-weight: 700; color: var(--ink); }
 .searchable-select-option:hover,
 .searchable-select-option:focus { background: var(--brand-soft); color: #3730a3; }
+
+.material-head { background: linear-gradient(115deg, #6477bd 0%, #4f63b5 42%, #1f2937 100%); }
+.material-form { border-left: 5px solid #4f63b5; }
+.material-table { min-width: 1320px; }
+.material-status { background: #e0f2fe !important; color: #075985 !important; }
+.material-status-form { display: grid; grid-template-columns: minmax(150px, 1fr) 105px auto; gap: .4rem; align-items: center; min-width: 310px; }
+.material-table .bi-flag { color: #64748b; margin-right: .15rem; }
+@media (max-width: 768px) { .material-status-form { grid-template-columns: 1fr; min-width: 220px; } }
