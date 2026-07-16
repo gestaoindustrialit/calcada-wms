@@ -235,6 +235,7 @@ class Repository extends Model
 
         $delimiter = ';';
         $headerMap = null;
+        $defaultWarehouse = $withLocation ? $this->singleWarehouseName() : null;
         $line = 0;
         while (($raw = fgets($handle)) !== false) {
             $line++;
@@ -257,6 +258,9 @@ class Repository extends Model
             $price = $this->csvNumber($values['price']);
             $warehouse = $values['warehouse'];
             [$section, $location] = $this->normalizeImportLocation($values['section'], $values['location']);
+            if ($warehouse === '' && $defaultWarehouse !== null) {
+                $warehouse = $defaultWarehouse;
+            }
             $quantity = $this->csvNumber($values['quantity']);
             $minQuantity = $this->csvNumber($values['min_quantity']);
 
@@ -276,7 +280,12 @@ class Repository extends Model
             }
             $hasLocationData = $warehouse !== '' || $section !== '' || $location !== '' || $values['quantity'] !== '' || $values['min_quantity'] !== '';
             if ($withLocation || $hasLocationData) {
-                if ($warehouse === '') { $result['errors'][] = "Linha {$line}: armazém em falta."; continue; }
+                if ($warehouse === '') {
+                    $result['errors'][] = $withLocation
+                        ? "Linha {$line}: armazém em falta; preencha a coluna armazém ou deixe apenas um armazém criado para ser usado por defeito."
+                        : "Linha {$line}: armazém em falta.";
+                    continue;
+                }
                 $warehouseId = $this->findOrCreateWarehouse($warehouse, $section, $location);
                 if ($section !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Setor', $section, $section);
                 if ($location !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Posição', $location, $location);
@@ -286,6 +295,14 @@ class Repository extends Model
         }
         fclose($handle);
         return $result;
+    }
+
+
+    private function singleWarehouseName(): ?string
+    {
+        $stmt = $this->db->query('SELECT name FROM warehouses ORDER BY id ASC LIMIT 2');
+        $warehouses = $stmt->fetchAll();
+        return count($warehouses) === 1 ? (string)$warehouses[0]['name'] : null;
     }
 
     private function csvValuesByPosition(array $row): array
