@@ -409,9 +409,27 @@ class Repository extends Model
 
     private function normalizeCsvHeader(string $header): string
     {
-        $header = $this->normalizeCsvEncoding($header);
-        $header = iconv('UTF-8', 'ASCII//TRANSLIT', $header) ?: $header;
-        return trim(preg_replace('/[^a-z0-9]+/', '_', strtolower($header)), '_');
+        $header = trim($this->normalizeCsvEncoding($header));
+
+        // Não depender do comportamento de transliteração do iconv/locale do servidor.
+        // Garante que cabeçalhos como armazém, designação, preço e localização
+        // são sempre convertidos para armazem, designacao, preco e localizacao.
+        $header = strtr($header, [
+            'Á'=>'A','À'=>'A','Â'=>'A','Ã'=>'A','Ä'=>'A',
+            'É'=>'E','È'=>'E','Ê'=>'E','Ë'=>'E',
+            'Í'=>'I','Ì'=>'I','Î'=>'I','Ï'=>'I',
+            'Ó'=>'O','Ò'=>'O','Ô'=>'O','Õ'=>'O','Ö'=>'O',
+            'Ú'=>'U','Ù'=>'U','Û'=>'U','Ü'=>'U',
+            'Ç'=>'C','Ñ'=>'N',
+            'á'=>'a','à'=>'a','â'=>'a','ã'=>'a','ä'=>'a',
+            'é'=>'e','è'=>'e','ê'=>'e','ë'=>'e',
+            'í'=>'i','ì'=>'i','î'=>'i','ï'=>'i',
+            'ó'=>'o','ò'=>'o','ô'=>'o','õ'=>'o','ö'=>'o',
+            'ú'=>'u','ù'=>'u','û'=>'u','ü'=>'u',
+            'ç'=>'c','ñ'=>'n',
+        ]);
+
+        return trim((string)preg_replace('/[^a-z0-9]+/', '_', strtolower($header)), '_');
     }
 
     private function csvNumber(string $value): float
