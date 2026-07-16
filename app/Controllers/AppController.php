@@ -69,7 +69,8 @@ class AppController extends Controller
             $_SESSION['flash'] = 'Importação: ' . $result['created'] . ' criados, ' . $result['updated'] . ' atualizados' . $extra . ($result['errors'] ? ' — ' . implode(' ', $result['errors']) : '.');
             $this->redirect(Url::page('items'));
         }
-        $this->crud('items', ['name','designation','unit','weighted_price'], 'items/index', 'Artigos');
+        $filters = array_intersect_key($_GET, array_flip(['q']));
+        $this->crud('items', ['name','designation','unit'], 'items/index', 'Artigos', ['rows'=>$this->repo->items($filters), 'filters'=>$filters]);
     }
     public function inventory(): void
     {
@@ -78,7 +79,7 @@ class AppController extends Controller
             $this->repo->delete('inventory', (int)$_GET['delete']);
             $this->redirect(Url::page('inventory'));
         }
-        $filters = array_intersect_key($_GET, array_flip(['q','item_id','warehouse_id','stock_status']));
+        $filters = array_intersect_key($_GET, array_flip(['q','item_id','warehouse_id']));
         $rows = $this->repo->inventory($filters);
         $this->view('inventory/index', ['title'=>'Inventário','rows'=>$rows,'summary'=>$this->repo->inventorySummary($rows),'filters'=>$filters,'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$this->editRow('inventory'), 'locations'=>$this->repo->warehouseLocations(), 'inventoryRows'=>$this->repo->inventory()]);
     }
@@ -138,9 +139,10 @@ class AppController extends Controller
     public function saveInventory(): void
     {
         $this->ensureChiefAllowed();
-        $data = array_intersect_key($_POST, array_flip(['item_id','warehouse_id','location','quantity','min_quantity']));
+        $data = array_intersect_key($_POST, array_flip(['item_id','warehouse_id','location','quantity']));
+        $data['min_quantity'] = 0;
         if (($_POST['movement_type'] ?? '') === 'split' && empty($_POST['id'])) {
-            $this->repo->splitInventory((int)$_POST['item_id'], (int)$_POST['warehouse_id'], (string)($_POST['source_location'] ?? ''), (string)($_POST['location'] ?? ''), (float)($_POST['quantity'] ?? 0), (float)($_POST['min_quantity'] ?? 0));
+            $this->repo->splitInventory((int)$_POST['item_id'], (int)$_POST['warehouse_id'], (string)($_POST['source_location'] ?? ''), (string)($_POST['location'] ?? ''), (float)($_POST['quantity'] ?? 0), 0);
             $this->redirect(Url::page('inventory'));
         }
         if (!empty($_POST['id'])) {
@@ -256,12 +258,12 @@ class AppController extends Controller
     public function export(string $type): void
     {
         $this->ensureChiefAllowed();
-        $filters = array_intersect_key($_GET, array_flip(['q','item_id','warehouse_id','stock_status']));
+        $filters = array_intersect_key($_GET, array_flip(['q','item_id','warehouse_id']));
         $rows = $this->repo->inventory($filters);
         if ($type === 'excel') {
             header('Content-Type: text/csv; charset=utf-8'); header('Content-Disposition: attachment; filename="inventario.csv"'); header('X-Content-Type-Options: nosniff');
-            $out = fopen('php://output','w'); fputcsv($out, ['Artigo','Armazém','Setor','Localização','Qtd','Unidade','P. Ponderado','Valor']);
-            foreach($rows as $r){ fputcsv($out, [$r['item'],$r['warehouse'],$r['section'],$r['location'],$r['quantity'],$r['unit'],$r['weighted_price'],$r['stock_value']]); } exit;
+            $out = fopen('php://output','w'); fputcsv($out, ['Artigo','Armazém','Setor','Localização','Qtd','Unidade']);
+            foreach($rows as $r){ fputcsv($out, [$r['item'],$r['warehouse'],$r['section'],$r['location'],$r['quantity'],$r['unit']]); } exit;
         }
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="inventario.pdf"');
@@ -282,9 +284,9 @@ class AppController extends Controller
         foreach (array_chunk($rows, 26) ?: [[]] as $pageIndex => $chunk) {
             $content = "0.07 0.09 0.17 rg 0 730 612 62 re f\n0.31 0.27 0.90 rg 0 724 612 6 re f\n";
             $content .= "1 1 1 rg\n" . $textAt(42, 766, 20, 'Inventário') . $textAt(42, 744, 10, 'Relatório de stock filtrado');
-            $content .= "0.10 0.16 0.28 rg\n" . $textAt(42, 700, 9, 'Linhas: ' . $summary['lines']) . $textAt(170, 700, 9, 'Quantidade total: ' . number_format((float)$summary['quantity'], 2, ',', '.')) . $textAt(360, 700, 9, 'Valor total: EUR ' . number_format((float)$summary['value'], 2, ',', '.'));
+            $content .= "0.10 0.16 0.28 rg\n" . $textAt(42, 700, 9, 'Linhas: ' . $summary['lines']) . $textAt(170, 700, 9, 'Quantidade total: ' . number_format((float)$summary['quantity'], 2, ',', '.'));
             $content .= "0.94 0.96 0.99 rg 36 660 540 24 re f\n0.78 0.82 0.90 RG 36 660 540 24 re S\n0.20 0.25 0.34 rg\n";
-            $content .= $textAt(46, 668, 8, 'Artigo') . $textAt(166, 668, 8, 'Armazém') . $textAt(276, 668, 8, 'Setor') . $textAt(366, 668, 8, 'Localização') . $textAt(456, 668, 8, 'Qtd') . $textAt(512, 668, 8, 'Valor');
+            $content .= $textAt(46, 668, 8, 'Artigo') . $textAt(166, 668, 8, 'Armazém') . $textAt(276, 668, 8, 'Setor') . $textAt(366, 668, 8, 'Localização') . $textAt(456, 668, 8, 'Qtd');
             $y = 638;
             foreach ($chunk as $index => $r) {
                 $content .= ($index % 2 === 0 ? "0.99 1 1 rg" : "0.96 0.98 1 rg") . " 36 " . ($y - 7) . " 540 22 re f\n0.10 0.16 0.28 rg\n";
@@ -293,7 +295,6 @@ class AppController extends Controller
                 $content .= $textAt(276, $y, 7, mb_strimwidth((string)($r['section'] ?? ''), 0, 20, '…', 'UTF-8'));
                 $content .= $textAt(366, $y, 7, mb_strimwidth((string)($r['location'] ?? ''), 0, 20, '…', 'UTF-8'));
                 $content .= $textAt(456, $y, 7, $r['quantity'] . ' ' . $r['unit']);
-                $content .= $textAt(512, $y, 7, 'EUR ' . number_format((float)$r['stock_value'], 2, ',', '.'));
                 $y -= 22;
             }
             $content .= "0.55 0.60 0.70 rg\n" . $textAt(42, 34, 8, 'Calçada WMS · inventário exportado em ' . date('d/m/Y H:i')) . $textAt(520, 34, 8, 'Pág. ' . ($pageIndex + 1));
