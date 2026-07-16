@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS inventory (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     item_id INTEGER NOT NULL,
     warehouse_id INTEGER NOT NULL,
+    location TEXT NOT NULL DEFAULT '',
     quantity REAL NOT NULL DEFAULT 0,
     min_quantity REAL NOT NULL DEFAULT 0,
     FOREIGN KEY(item_id) REFERENCES items(id),
