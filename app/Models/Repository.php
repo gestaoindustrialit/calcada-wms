@@ -479,7 +479,7 @@ class Repository extends Model
                         : "Linha {$line}: armazém em falta.";
                     continue;
                 }
-                $warehouseId = $this->findOrCreateWarehouse($warehouse, $section, $location);
+                $warehouseId = $this->findOrCreateWarehouse($warehouse, $section);
                 if ($section !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Setor', $section, $section);
                 if ($location !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Posição', $location, $location);
                 $stockKey = $itemId . '|' . $warehouseId . '|' . $location;
@@ -549,7 +549,7 @@ class Repository extends Model
             'price'=>['preco','preco_ponderado','p_ponderado','weighted_price','price'],
             'warehouse'=>['armazem','warehouse','deposito'],
             'section'=>['setor','sector','section','seccao'],
-            'location'=>['localizacao','local','location','posicao'],
+            'location'=>['localizacao','localizacao_posicao','localizacao_pos','local_posicao','local','location','position','posicao','pos'],
             'quantity'=>['qtd','quantidade','quantity','stock'],
             'min_quantity'=>['min','minimo','quantidade_minima','min_quantity'],
         ];
