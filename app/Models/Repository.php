@@ -239,6 +239,7 @@ class Repository extends Model
         $line = 0;
         while (($raw = fgets($handle)) !== false) {
             $line++;
+            $raw = $this->normalizeCsvEncoding($raw);
             if ($line === 1) {
                 $delimiter = $this->detectCsvDelimiter($raw);
             }
@@ -306,6 +307,16 @@ class Repository extends Model
         return $result;
     }
 
+    private function normalizeCsvEncoding(string $line): string
+    {
+        if (str_starts_with($line, "\xEF\xBB\xBF")) {
+            $line = substr($line, 3);
+        }
+        if (mb_check_encoding($line, 'UTF-8')) {
+            return $line;
+        }
+        return mb_convert_encoding($line, 'UTF-8', 'Windows-1252, ISO-8859-1, UTF-8');
+    }
 
     private function detectCsvDelimiter(string $line): string
     {
@@ -365,6 +376,7 @@ class Repository extends Model
 
     private function normalizeCsvHeader(string $header): string
     {
+        $header = $this->normalizeCsvEncoding($header);
         $header = iconv('UTF-8', 'ASCII//TRANSLIT', $header) ?: $header;
         return trim(preg_replace('/[^a-z0-9]+/', '_', strtolower($header)), '_');
     }
