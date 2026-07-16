@@ -151,7 +151,18 @@ class Repository extends Model
         return $row ?: null;
     }
 
-    public function items(): array { return $this->all('items'); }
+    public function items(array $filters = []): array
+    {
+        $where = '';
+        $params = [];
+        if (($filters['q'] ?? '') !== '') {
+            $where = ' WHERE name LIKE :q OR designation LIKE :q OR unit LIKE :q';
+            $params['q'] = '%' . trim((string)$filters['q']) . '%';
+        }
+        $stmt = $this->db->prepare('SELECT * FROM items' . $where . ' ORDER BY name ASC, designation ASC');
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
     public function warehouses(): array { return $this->all('warehouses'); }
 
     public function roles(): array
@@ -264,14 +275,12 @@ class Repository extends Model
         $params = [];
         if (!empty($filters['item_id'])) { $where[] = 'inventory.item_id = :item_id'; $params['item_id'] = (int)$filters['item_id']; }
         if (!empty($filters['warehouse_id'])) { $where[] = 'inventory.warehouse_id = :warehouse_id'; $params['warehouse_id'] = (int)$filters['warehouse_id']; }
-        if (($filters['stock_status'] ?? '') === 'low') $where[] = 'inventory.quantity <= inventory.min_quantity';
-        if (($filters['stock_status'] ?? '') === 'available') $where[] = 'inventory.quantity > inventory.min_quantity';
         if (($filters['q'] ?? '') !== '') {
             $where[] = '(items.name LIKE :q OR items.designation LIKE :q OR warehouses.name LIKE :q OR warehouses.section LIKE :q OR warehouses.location LIKE :q OR inventory.location LIKE :q)';
             $params['q'] = '%' . trim((string)$filters['q']) . '%';
         }
-        $sql = "SELECT inventory.*, items.name AS item, items.designation, items.unit, items.weighted_price, warehouses.name AS warehouse, warehouses.section, COALESCE(NULLIF(inventory.location, ''), warehouses.location) AS location,
-            (inventory.quantity * items.weighted_price) AS stock_value
+        $sql = "SELECT inventory.*, items.name AS item, items.designation, items.unit, 0 AS weighted_price, warehouses.name AS warehouse, warehouses.section, COALESCE(NULLIF(inventory.location, ''), warehouses.location) AS location,
+            0 AS stock_value
             FROM inventory JOIN items ON items.id=inventory.item_id JOIN warehouses ON warehouses.id=inventory.warehouse_id";
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
         $sql .= ' ORDER BY items.name ASC, warehouses.name ASC, location ASC';
@@ -285,7 +294,7 @@ class Repository extends Model
         return [
             'lines' => count($rows),
             'quantity' => array_sum(array_map(fn($r) => (float)$r['quantity'], $rows)),
-            'value' => array_sum(array_map(fn($r) => (float)$r['stock_value'], $rows)),
+            'value' => 0,
         ];
     }
 
@@ -382,6 +391,7 @@ class Repository extends Model
         $headerMap = null;
         $defaultWarehouse = $withLocation ? $this->singleWarehouseName() : null;
         $line = 0;
+        $stockTotals = [];
         while (($raw = fgets($handle)) !== false) {
             $line++;
             $raw = $this->normalizeCsvEncoding($raw);
@@ -410,14 +420,14 @@ class Repository extends Model
             $name = $values['name'];
             $designation = $values['designation'];
             $unit = $values['unit'];
-            $price = $this->csvNumber($values['price']);
+            $price = 0.0;
             $warehouse = $values['warehouse'];
             [$section, $location] = $this->normalizeImportLocation($values['section'], $values['location']);
             if ($warehouse === '' && $defaultWarehouse !== null) {
                 $warehouse = $defaultWarehouse;
             }
             $quantity = $this->csvNumber($values['quantity']);
-            $minQuantity = $this->csvNumber($values['min_quantity']);
+            $minQuantity = 0.0;
 
             if ($name === '') { $result['errors'][] = "Linha {$line}: nome em falta."; continue; }
             $stmt = $this->db->prepare('SELECT id FROM items WHERE name = ? LIMIT 1');
@@ -430,10 +440,12 @@ class Repository extends Model
                 $result['updated']++;
             } else {
                 $this->insert('items', $data);
-                $itemId = (int)$this->db->lastInsertId();
+                $stmt = $this->db->prepare('SELECT id FROM items WHERE name = ? LIMIT 1');
+                $stmt->execute([$name]);
+                $itemId = (int)$stmt->fetchColumn();
                 $result['created']++;
             }
-            $hasLocationData = $warehouse !== '' || $section !== '' || $location !== '' || $values['quantity'] !== '' || $values['min_quantity'] !== '';
+            $hasLocationData = $warehouse !== '' || $section !== '' || $location !== '' || $values['quantity'] !== '';
             if ($withLocation || $hasLocationData) {
                 if ($warehouse === '') {
                     $result['errors'][] = $withLocation
@@ -444,7 +456,9 @@ class Repository extends Model
                 $warehouseId = $this->findOrCreateWarehouse($warehouse, $section, $location);
                 if ($section !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Setor', $section, $section);
                 if ($location !== '') $this->findOrCreateWarehouseLocation($warehouseId, 'Posição', $location, $location);
-                $this->saveInventory(['item_id'=>$itemId,'warehouse_id'=>$warehouseId,'location'=>$location,'quantity'=>$quantity,'min_quantity'=>$minQuantity]);
+                $stockKey = $itemId . '|' . $warehouseId . '|' . $location;
+                $stockTotals[$stockKey] = ($stockTotals[$stockKey] ?? 0.0) + $quantity;
+                $this->saveInventory(['item_id'=>$itemId,'warehouse_id'=>$warehouseId,'location'=>$location,'quantity'=>$stockTotals[$stockKey],'min_quantity'=>$minQuantity], 'set');
                 $result['stocked']++;
             }
         }
@@ -483,7 +497,9 @@ class Repository extends Model
 
     private function csvValuesByPosition(array $row): array
     {
-        [$name,$designation,$unit,$price,$warehouse,$section,$location,$quantity,$minQuantity] = array_pad($row, 9, '');
+        [$name,$designation,$unit,$warehouse,$section,$location,$quantity] = array_pad($row, 7, '');
+        $price = '';
+        $minQuantity = '';
         return compact('name','designation','unit','price','warehouse','section','location','quantity','minQuantity') + ['min_quantity'=>$minQuantity];
     }
 
@@ -579,7 +595,9 @@ class Repository extends Model
             return (int)$warehouse['id'];
         }
         $this->insert('warehouses', ['name'=>$name, 'section'=>$section ?: '-', 'location'=>$location ?: '-']);
-        return (int)$this->db->lastInsertId();
+        $stmt = $this->db->prepare('SELECT id FROM warehouses WHERE LOWER(name) = LOWER(?) LIMIT 1');
+        $stmt->execute([$name]);
+        return (int)$stmt->fetchColumn();
     }
 
     private function findOrCreateWarehouseLocation(int $warehouseId, string $type, string $code, string $description = ''): void
