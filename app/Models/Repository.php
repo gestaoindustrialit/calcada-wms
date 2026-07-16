@@ -189,24 +189,50 @@ class Repository extends Model
     public function saveInventory(array $data, string $movementType = 'in'): void
     {
         $quantity = abs((float)($data['quantity'] ?? 0));
+        if ($movementType !== 'set' && $quantity <= 0) {
+            return;
+        }
+
         $delta = $movementType === 'out' ? -$quantity : $quantity;
         $data['quantity'] = $movementType === 'set' ? (float)($data['quantity'] ?? 0) : $delta;
         $data['location'] = trim((string)($data['location'] ?? ''));
-        $stmt = $this->db->prepare('SELECT id, quantity FROM inventory WHERE item_id = ? AND warehouse_id = ? AND location = ?');
+
+        $stmt = $this->db->prepare('SELECT id, quantity FROM inventory WHERE item_id = ? AND warehouse_id = ? AND location = ? ORDER BY id ASC');
         $stmt->execute([(int)$data['item_id'], (int)$data['warehouse_id'], $data['location']]);
-        $existing = $stmt->fetch();
-        if ($existing) {
-            $before = $this->find('inventory', (int)$existing['id']);
-            if ($movementType === 'set') {
-                $this->db->prepare('UPDATE inventory SET quantity = MAX(:quantity, 0), min_quantity = :min_quantity WHERE id = :id')->execute([
-                    'quantity'=>(float)$data['quantity'], 'min_quantity'=>(float)$data['min_quantity'], 'id'=>(int)$existing['id'],
-                ]);
-            } else {
-                $this->db->prepare('UPDATE inventory SET quantity = MAX(quantity + :quantity, 0), min_quantity = :min_quantity WHERE id = :id')->execute([
-                    'quantity'=>(float)$data['quantity'], 'min_quantity'=>(float)$data['min_quantity'], 'id'=>(int)$existing['id'],
-                ]);
+        $existingRows = $stmt->fetchAll();
+        if ($existingRows) {
+            $primary = $existingRows[0];
+            $before = $this->find('inventory', (int)$primary['id']);
+            $currentQuantity = array_sum(array_map(fn($row) => (float)$row['quantity'], $existingRows));
+            $newQuantity = $movementType === 'set' ? (float)$data['quantity'] : max($currentQuantity + (float)$data['quantity'], 0);
+
+            $ownsTransaction = !$this->db->inTransaction();
+            if ($ownsTransaction) {
+                $this->db->beginTransaction();
             }
-            $this->logAction('inventory', (int)$existing['id'], 'update', $before, $this->find('inventory', (int)$existing['id']));
+            try {
+                $this->db->prepare('UPDATE inventory SET quantity = :quantity, min_quantity = :min_quantity WHERE id = :id')->execute([
+                    'quantity'=>max($newQuantity, 0), 'min_quantity'=>(float)$data['min_quantity'], 'id'=>(int)$primary['id'],
+                ]);
+                $duplicateIds = array_map(fn($row) => (int)$row['id'], array_slice($existingRows, 1));
+                if ($duplicateIds) {
+                    $placeholders = implode(',', array_fill(0, count($duplicateIds), '?'));
+                    $this->db->prepare("DELETE FROM inventory WHERE id IN ({$placeholders})")->execute($duplicateIds);
+                }
+                if ($ownsTransaction) {
+                    $this->db->commit();
+                }
+            } catch (\Throwable $e) {
+                if ($ownsTransaction && $this->db->inTransaction()) {
+                    $this->db->rollBack();
+                }
+                throw $e;
+            }
+            $this->logAction('inventory', (int)$primary['id'], 'update', $before, $this->find('inventory', (int)$primary['id']));
+            return;
+        }
+
+        if ($movementType === 'out') {
             return;
         }
         $data['quantity'] = max((float)$data['quantity'], 0);
