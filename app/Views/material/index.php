@@ -17,9 +17,9 @@ $departmentOptions = ['Desenho técnico 3D', 'Tornearia', 'Desenho técnico 3D e
         <p>Registe pedidos de utensílios e acompanhe os pendentes da equipa de Tornearia / Desenho Técnico num fluxo semelhante ao SharePoint.</p>
     </div>
     <div class="btn-cluster">
-        <a class="btn <?= (!$isCompletedView && !$isBilledView) ? 'btn-dark' : 'btn-light' ?>" href="<?= Url::page('material') ?>&view=pending"><i class="bi bi-list-task"></i> Pendentes</a>
-        <a class="btn <?= $isCompletedView ? 'btn-dark' : 'btn-light' ?>" href="<?= Url::page('material') ?>&view=completed"><i class="bi bi-check2-circle"></i> Concluídos</a>
-        <a class="btn <?= $isBilledView ? 'btn-dark' : 'btn-light' ?>" href="<?= Url::page('material') ?>&view=billed"><i class="bi bi-receipt"></i> Faturadas</a>
+        <a class="btn <?= (!$isCompletedView && !$isBilledView) ? 'btn-dark' : 'btn-light' ?>" href="<?= Url::page('material', ['view'=>'pending']) ?>"><i class="bi bi-list-task"></i> Pendentes</a>
+        <a class="btn <?= $isCompletedView ? 'btn-dark' : 'btn-light' ?>" href="<?= Url::page('material', ['view'=>'completed']) ?>"><i class="bi bi-check2-circle"></i> Concluídos</a>
+        <a class="btn <?= $isBilledView ? 'btn-dark' : 'btn-light' ?>" href="<?= Url::page('material', ['view'=>'billed']) ?>"><i class="bi bi-receipt"></i> Faturadas</a>
     </div>
 </div>
 

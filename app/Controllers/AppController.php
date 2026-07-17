@@ -119,6 +119,64 @@ class AppController extends Controller
 
     public function reports(): void { $user = Auth::user(); $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam($user), 'currentUser'=>$user]); }
 
+
+    public function purchases(): void
+    {
+        $user = Auth::user();
+        $requestedView = $_GET['view'] ?? 'pending';
+        $viewMode = $requestedView === 'completed' ? 'completed' : 'pending';
+        $rows = $this->repo->purchaseRequests($viewMode, $user);
+        $histories = [];
+        foreach ($rows as $row) {
+            $histories[(int)$row['id']] = $this->repo->purchaseStatusHistory((int)$row['id']);
+        }
+        $this->view('purchases/index', [
+            'title'=>'Compras',
+            'rows'=>$rows,
+            'viewMode'=>$viewMode,
+            'currentUser'=>$user,
+            'canManagePurchases'=>$this->canManagePurchases($user),
+            'purchaseHistories'=>$histories,
+        ]);
+    }
+
+    public function savePurchase(): void
+    {
+        $user = Auth::user();
+        $data = array_intersect_key($_POST, array_flip(['article_name','quantity','urgency','link']));
+        $data['requester_name'] = $user['name'] ?? '';
+        $data['requester_team'] = $user['team'] ?? '';
+        $data['status'] = 'Pendente';
+        $data['status_changed_at'] = date('Y-m-d H:i:s');
+        $this->repo->insert('purchase_requests', $data);
+        $this->redirect(Url::page('purchases'));
+    }
+
+    public function purchaseStatus(): void
+    {
+        $user = Auth::user();
+        if (!$this->canManagePurchases($user)) {
+            $this->redirect(Url::page('purchases'));
+        }
+        $id = (int)($_POST['id'] ?? 0);
+        $status = (string)($_POST['status'] ?? '');
+        $allowed = ['Pendente', 'Aprovado', 'Cancelado', 'Encomendado', 'Entregue'];
+        if ($id > 0 && in_array($status, $allowed, true)) {
+            $this->repo->updatePurchaseStatus($id, $status, $user);
+        }
+        $targetView = in_array($status, ['Cancelado', 'Entregue'], true) ? 'completed' : 'pending';
+        $this->redirect(Url::page('purchases') . '&view=' . $targetView);
+    }
+
+    public function deletePurchase(): void
+    {
+        if ($this->canManagePurchases(Auth::user())) {
+            $this->repo->delete('purchase_requests', (int)($_POST['id'] ?? 0));
+        }
+        $view = ($_POST['view'] ?? '') === 'completed' ? 'completed' : 'pending';
+        $this->redirect(Url::page('purchases') . '&view=' . $view);
+    }
+
     public function material(): void
     {
         $user = Auth::user();
@@ -329,6 +387,12 @@ class AppController extends Controller
             return [$originalName, null];
         }
         return [$originalName, 'data/material_uploads/' . $storedName];
+    }
+
+    private function canManagePurchases(?array $user = null): bool
+    {
+        $role = strtolower((string)($user['role'] ?? ''));
+        return in_array($role, ['admin', 'compras'], true);
     }
 
     private function canManageRequests(?array $user = null): bool
