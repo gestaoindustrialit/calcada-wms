@@ -30,6 +30,7 @@ $routes = [
     'purchases'=>fn()=> $controller->purchases(),
     'purchase_save'=>fn()=> $controller->savePurchase(),
     'purchase_status'=>fn()=> $controller->purchaseStatus(),
+    'purchase_delete'=>fn()=> $controller->deletePurchase(),
     'material'=>fn()=> $controller->material(),
     'material_save'=>fn()=> $controller->saveMaterial(),
     'material_status'=>fn()=> $controller->materialStatus(),

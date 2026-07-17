@@ -4,6 +4,7 @@ use App\Core\Url;
 $isCompletedView = ($viewMode ?? 'pending') === 'completed';
 $canManagePurchases = !empty($canManagePurchases);
 $statusOptions = ['Pendente', 'Aprovado', 'Cancelado', 'Encomendado', 'Entregue'];
+$purchaseHistories = $purchaseHistories ?? [];
 ?>
 <div class="page-head purchases-head">
     <div>
@@ -31,20 +32,26 @@ $statusOptions = ['Pendente', 'Aprovado', 'Cancelado', 'Encomendado', 'Entregue'
 <?php endif; ?>
 
 <div class="data-shell"><div class="table-responsive"><table class="table modern-table align-middle purchases-table">
-<thead><tr><th>Estado</th><th>Criado</th><th>Pedido por</th><th>Equipa</th><th>Artigo</th><th>Qtd</th><th>Urgência</th><th>Link</th><?php if($canManagePurchases): ?><th>Ações</th><?php endif; ?></tr></thead>
+<thead><tr><th>Estado</th><th>Criado</th><th>Últ. alteração</th><th>Pedido por</th><th>Equipa</th><th>Artigo</th><th>Qtd</th><th>Urgência</th><th>Link</th><th>Histórico</th><?php if($canManagePurchases): ?><th>Ações</th><?php endif; ?></tr></thead>
 <tbody>
-<?php foreach($rows as $row): ?>
+<?php foreach($rows as $row): $history = $purchaseHistories[(int)$row['id']] ?? []; $historyModalId = 'purchaseHistory'.(int)$row['id']; ?>
 <tr>
 <td><span class="badge status-badge status-<?= strtolower($row['status']) ?>"><?= htmlspecialchars($row['status']) ?></span></td>
 <td><?= htmlspecialchars(date('d/m/Y H:i', strtotime($row['created_at']))) ?></td>
+<td><?= !empty($row['status_changed_at']) ? htmlspecialchars(date('d/m/Y H:i', strtotime($row['status_changed_at']))) : '<span class="text-muted">—</span>' ?></td>
 <td><?= htmlspecialchars($row['requester_name'] ?? '') ?></td>
 <td><?= htmlspecialchars($row['requester_team'] ?? '') ?></td>
 <td><strong><?= htmlspecialchars($row['article_name']) ?></strong></td>
 <td><?= htmlspecialchars($row['quantity']) ?></td>
 <td><?= str_repeat('<i class="bi bi-flag-fill"></i>', (int)$row['urgency']) ?></td>
 <td><?php if(!empty($row['link'])): ?><a href="<?= htmlspecialchars($row['link']) ?>" target="_blank" rel="noopener" class="mini-link">Abrir <i class="bi bi-box-arrow-up-right"></i></a><?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
-<?php if($canManagePurchases): ?><td><form method="post" action="<?= Url::page('purchase_status') ?>" class="purchase-status-form"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><select class="form-select form-select-sm" name="status"><?php foreach($statusOptions as $status): ?><option value="<?= htmlspecialchars($status) ?>" <?= $row['status']===$status?'selected':'' ?>><?= htmlspecialchars($status) ?></option><?php endforeach; ?></select><button class="btn btn-primary btn-sm" title="Guardar"><i class="bi bi-check-lg"></i></button></form></td><?php endif; ?>
+<td><button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#<?= $historyModalId ?>" title="Ver histórico"><i class="bi bi-clock-history"></i> <?= (int)($row['history_count'] ?? count($history)) ?></button></td>
+<?php if($canManagePurchases): ?><td><div class="purchase-actions"><form method="post" action="<?= Url::page('purchase_status') ?>" class="purchase-status-form"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><select class="form-select form-select-sm" name="status" title="Alterar estado entre Ativas e Fechadas"><?php foreach($statusOptions as $status): ?><option value="<?= htmlspecialchars($status) ?>" <?= $row['status']===$status?'selected':'' ?>><?= htmlspecialchars($status) ?></option><?php endforeach; ?></select><button class="btn btn-primary btn-sm" title="Guardar"><i class="bi bi-check-lg"></i></button></form><form method="post" action="<?= Url::page('purchase_delete') ?>" onsubmit="return confirm('Eliminar este pedido de compra?')"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><input type="hidden" name="view" value="<?= $isCompletedView ? 'completed' : 'pending' ?>"><button class="btn btn-danger btn-sm" title="Eliminar pedido"><i class="bi bi-trash"></i></button></form></div></td><?php endif; ?>
 </tr>
 <?php endforeach; ?>
-<?php if(!$rows): ?><tr><td colspan="<?= $canManagePurchases ? 9 : 8 ?>" class="text-center text-muted py-5">Sem pedidos nesta vista.</td></tr><?php endif; ?>
+<?php if(!$rows): ?><tr><td colspan="<?= $canManagePurchases ? 11 : 10 ?>" class="text-center text-muted py-5">Sem pedidos nesta vista.</td></tr><?php endif; ?>
 </tbody></table></div></div>
+
+<?php foreach($rows as $row): $history = $purchaseHistories[(int)$row['id']] ?? []; $historyModalId = 'purchaseHistory'.(int)$row['id']; ?>
+<div class="modal fade" id="<?= $historyModalId ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content deliver-modal"><div class="modal-header"><div><span class="eyebrow">Histórico de compras</span><h5 class="modal-title"><?= htmlspecialchars($row['article_name']) ?></h5></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div><div class="modal-body"><?php if($history): ?><div class="purchase-history-list"><?php foreach($history as $entry): ?><div class="purchase-history-entry"><strong><?= htmlspecialchars(($entry['old_status'] ?: '—') . ' → ' . $entry['new_status']) ?></strong><span><?= htmlspecialchars(date('d/m/Y H:i', strtotime($entry['changed_at']))) ?> · <?= htmlspecialchars($entry['changed_by'] ?? 'Sistema') ?><?= !empty($entry['changed_role']) ? ' (' . htmlspecialchars($entry['changed_role']) . ')' : '' ?></span></div><?php endforeach; ?></div><?php else: ?><p class="text-muted mb-0">Ainda não existem alterações de estado registadas para este pedido.</p><?php endif; ?></div></div></div></div>
+<?php endforeach; ?>

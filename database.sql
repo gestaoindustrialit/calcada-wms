@@ -100,5 +100,18 @@ CREATE TABLE IF NOT EXISTS purchase_requests (
     link TEXT,
     urgency INTEGER NOT NULL DEFAULT 1,
     status TEXT NOT NULL DEFAULT 'Pendente',
+    status_changed_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE IF NOT EXISTS purchase_status_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    purchase_request_id INTEGER NOT NULL,
+    old_status TEXT,
+    new_status TEXT NOT NULL,
+    changed_by TEXT,
+    changed_role TEXT,
+    changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(purchase_request_id) REFERENCES purchase_requests(id)
 );

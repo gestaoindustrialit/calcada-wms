@@ -123,7 +123,13 @@ class AppController extends Controller
     {
         $user = Auth::user();
         $viewMode = ($_GET['view'] ?? 'pending') === 'completed' ? 'completed' : 'pending';
-        $this->view('purchases/index', ['title'=>'Compras', 'rows'=>$this->repo->purchaseRequests($viewMode), 'viewMode'=>$viewMode, 'currentUser'=>$user, 'canManagePurchases'=>$this->canManagePurchases($user)]);
+        $rows = [];
+        $histories = [];
+        foreach ($this->repo->purchaseRequests($viewMode) as $row) {
+            $rows[] = $row;
+            $histories[(int)$row['id']] = $this->repo->purchaseStatusHistory((int)$row['id']);
+        }
+        $this->view('purchases/index', ['title'=>'Compras', 'rows'=>$rows ?? [], 'purchaseHistories'=>$histories, 'viewMode'=>$viewMode, 'currentUser'=>$user, 'canManagePurchases'=>$this->canManagePurchases($user)]);
     }
 
     public function savePurchase(): void
@@ -144,6 +150,15 @@ class AppController extends Controller
         }
         $this->repo->setPurchaseRequestStatus((int)($_POST['id'] ?? 0), (string)($_POST['status'] ?? 'Pendente'));
         $this->redirect(Url::page('purchases') . (in_array(($_POST['status'] ?? ''), ['Entregue', 'Cancelado'], true) ? '&view=completed' : ''));
+    }
+
+    public function deletePurchase(): void
+    {
+        if (!$this->canManagePurchases(Auth::user())) {
+            $this->redirect(Url::page('purchases'));
+        }
+        $this->repo->deletePurchaseRequest((int)($_POST['id'] ?? 0));
+        $this->redirect(Url::page('purchases') . (($_POST['view'] ?? '') === 'completed' ? '&view=completed' : ''));
     }
 
     public function material(): void
@@ -296,7 +311,8 @@ class AppController extends Controller
     private function canManagePurchases(?array $user = null): bool
     {
         $role = strtolower((string)($user['role'] ?? ''));
-        return in_array($role, ['admin', 'compras'], true);
+        $team = strtolower((string)($user['team'] ?? ''));
+        return in_array($role, ['admin', 'compras'], true) || str_contains($team, 'compras');
     }
 
     private function canManageMaterial(?array $user = null): bool
