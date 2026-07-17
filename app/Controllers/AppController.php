@@ -119,6 +119,49 @@ class AppController extends Controller
 
     public function reports(): void { $user = Auth::user(); $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam($user), 'currentUser'=>$user]); }
 
+
+    public function purchases(): void
+    {
+        $user = Auth::user();
+        $viewMode = ($_GET['view'] ?? 'pending') === 'completed' ? 'completed' : 'pending';
+        $rows = [];
+        $histories = [];
+        foreach ($this->repo->purchaseRequests($viewMode) as $row) {
+            $rows[] = $row;
+            $histories[(int)$row['id']] = $this->repo->purchaseStatusHistory((int)$row['id']);
+        }
+        $this->view('purchases/index', ['title'=>'Compras', 'rows'=>$rows, 'purchaseHistories'=>$histories, 'viewMode'=>$viewMode, 'currentUser'=>$user, 'canManagePurchases'=>$this->canManagePurchases($user)]);
+    }
+
+    public function savePurchase(): void
+    {
+        $user = Auth::user();
+        $data = array_intersect_key($_POST, array_flip(['article_name','quantity','link','urgency']));
+        $data['requester_name'] = $user['name'] ?? '';
+        $data['requester_team'] = $user['team'] ?? '';
+        $data['status'] = 'Pendente';
+        $this->repo->insert('purchase_requests', $data);
+        $this->redirect(Url::page('purchases'));
+    }
+
+    public function purchaseStatus(): void
+    {
+        if (!$this->canManagePurchases(Auth::user())) {
+            $this->redirect(Url::page('purchases'));
+        }
+        $this->repo->setPurchaseRequestStatus((int)($_POST['id'] ?? 0), (string)($_POST['status'] ?? 'Pendente'));
+        $this->redirect(Url::page('purchases') . (in_array(($_POST['status'] ?? ''), ['Entregue', 'Cancelado'], true) ? '&view=completed' : ''));
+    }
+
+    public function deletePurchase(): void
+    {
+        if (!$this->canManagePurchases(Auth::user())) {
+            $this->redirect(Url::page('purchases'));
+        }
+        $this->repo->deletePurchaseRequest((int)($_POST['id'] ?? 0));
+        $this->redirect(Url::page('purchases') . (($_POST['view'] ?? '') === 'completed' ? '&view=completed' : ''));
+    }
+
     public function material(): void
     {
         $user = Auth::user();
@@ -279,6 +322,14 @@ class AppController extends Controller
     {
         $role = strtolower((string)($user['role'] ?? ''));
         return in_array($role, ['admin', 'compras'], true);
+    }
+
+
+    private function canManagePurchases(?array $user = null): bool
+    {
+        $role = strtolower((string)($user['role'] ?? ''));
+        $team = strtolower((string)($user['team'] ?? ''));
+        return in_array($role, ['admin', 'compras'], true) || str_contains($team, 'compras');
     }
 
     private function canManageMaterial(?array $user = null): bool

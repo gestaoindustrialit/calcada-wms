@@ -56,6 +56,30 @@ CREATE TABLE IF NOT EXISTS requests (
     FOREIGN KEY(item_id) REFERENCES items(id)
 );
 
+CREATE TABLE IF NOT EXISTS purchase_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    requester_name TEXT,
+    requester_team TEXT,
+    article_name TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    link TEXT,
+    urgency INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'Pendente',
+    status_changed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS purchase_status_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    purchase_request_id INTEGER NOT NULL,
+    old_status TEXT,
+    new_status TEXT NOT NULL,
+    changed_by TEXT,
+    changed_role TEXT,
+    changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(purchase_request_id) REFERENCES purchase_requests(id)
+);
+
 CREATE TABLE IF NOT EXISTS action_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     table_name TEXT NOT NULL,
