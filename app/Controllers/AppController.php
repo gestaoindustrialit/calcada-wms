@@ -167,20 +167,23 @@ class AppController extends Controller
     public function materialStatus(): void
     {
         $user = Auth::user();
+        $id = (int)($_POST['id'] ?? 0);
+        $request = $this->repo->find('material_requests', $id);
         $status = (string)($_POST['status'] ?? '');
         $data = [];
         if ($status !== '' && $this->canManageMaterial($user)) {
             $data['status'] = $status;
             $data['completed_quantity'] = max((float)($_POST['completed_quantity'] ?? 0), 0);
+            if ($status === 'Concluído' && ($request['status'] ?? '') !== 'Concluído') {
+                $data['due_date'] = date('Y-m-d');
+            }
         }
         if ($this->canEditMaterialDetails($user)) {
-            $data['due_date'] = (string)($_POST['due_date'] ?? '');
             $data['notes'] = trim((string)($_POST['notes'] ?? ''));
         }
         if ($this->canInvoiceMaterial($user)) {
             $data['billed'] = isset($_POST['billed']) ? 1 : 0;
         }
-        $id = (int)($_POST['id'] ?? 0);
         if ($data) {
             $this->repo->updateMaterialRequestWorkflow($id, $data);
         }
