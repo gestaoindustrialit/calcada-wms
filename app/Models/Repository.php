@@ -6,7 +6,7 @@ use App\Core\Model;
 
 class Repository extends Model
 {
-    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','purchase_requests','purchase_status_history','action_logs'];
+    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','action_logs'];
 
     public function all(string $table): array
     {
@@ -406,77 +406,24 @@ class Repository extends Model
         $this->delete('requests', $id);
     }
 
-    public function purchaseRequests(string $view = 'pending'): array
-    {
-        $completed = $view === 'completed';
-        $operator = $completed ? 'IN' : 'NOT IN';
-        $stmt = $this->db->prepare("SELECT purchase_requests.*, (SELECT COUNT(*) FROM purchase_status_history WHERE purchase_status_history.purchase_request_id = purchase_requests.id) AS history_count FROM purchase_requests WHERE status {$operator} ('Entregue', 'Cancelado') ORDER BY urgency DESC, created_at DESC");
-        $stmt->execute();
-        return $stmt->fetchAll();
-    }
-
-    public function setPurchaseRequestStatus(int $id, string $status): void
-    {
-        $allowed = ['Pendente', 'Aprovado', 'Cancelado', 'Encomendado', 'Entregue'];
-        if (!in_array($status, $allowed, true)) {
-            $status = 'Pendente';
-        }
-        $request = $this->find('purchase_requests', $id);
-        if (!$request) return;
-        $before = $request;
-        $this->db->prepare('UPDATE purchase_requests SET status = :status, status_changed_at = CURRENT_TIMESTAMP WHERE id = :id')->execute(['status'=>$status, 'id'=>$id]);
-        $user = Auth::user();
-        $this->db->prepare('INSERT INTO purchase_status_history (purchase_request_id,old_status,new_status,changed_by,changed_role) VALUES (:purchase_request_id,:old_status,:new_status,:changed_by,:changed_role)')->execute([
-            'purchase_request_id'=>$id,
-            'old_status'=>$request['status'] ?? null,
-            'new_status'=>$status,
-            'changed_by'=>$user['name'] ?? 'Sistema',
-            'changed_role'=>$user['role'] ?? '',
-        ]);
-        $this->logAction('purchase_requests', $id, 'update', $before, $this->find('purchase_requests', $id));
-    }
-
-    public function purchaseStatusHistory(int $id): array
-    {
-        $stmt = $this->db->prepare('SELECT * FROM purchase_status_history WHERE purchase_request_id = ? ORDER BY changed_at DESC, id DESC');
-        $stmt->execute([$id]);
-        return $stmt->fetchAll();
-    }
-
-    public function deletePurchaseRequest(int $id): void
-    {
-        $request = $this->find('purchase_requests', $id);
-        if (!$request) return;
-        $this->db->beginTransaction();
-        try {
-            $this->db->prepare('DELETE FROM purchase_status_history WHERE purchase_request_id = ?')->execute([$id]);
-            $this->delete('purchase_requests', $id);
-            $this->db->commit();
-        } catch (\Throwable $e) {
-            $this->db->rollBack();
-            throw $e;
-        }
-    }
-
     public function materialRequests(string $view = 'pending'): array
     {
         $completed = $view === 'completed';
-        $operator = $completed ? '=' : '!=';
-        $stmt = $this->db->prepare("SELECT * FROM material_requests WHERE status {$operator} 'Concluído' ORDER BY due_date ASC, urgency DESC, created_at DESC");
+        $statuses = "'Concluído','Faturado'";
+        $operator = $completed ? 'IN' : 'NOT IN';
+        $stmt = $this->db->prepare("SELECT * FROM material_requests WHERE status {$operator} ({$statuses}) ORDER BY due_date ASC, urgency DESC, created_at DESC");
         $stmt->execute();
         return $stmt->fetchAll();
     }
 
-    public function setMaterialRequestStatus(int $id, string $status, float $completedQuantity): void
+    public function updateMaterialRequestWorkflow(int $id, array $data): void
     {
         $request = $this->find('material_requests', $id);
-        if (!$request) return;
+        if (!$request || !$data) return;
         $before = $request;
-        $this->db->prepare('UPDATE material_requests SET status = :status, completed_quantity = :completed_quantity WHERE id = :id')->execute([
-            'status'=>$status,
-            'completed_quantity'=>max($completedQuantity, 0),
-            'id'=>$id,
-        ]);
+        $sets = implode(',', array_map(fn($col) => "{$col} = :{$col}", array_keys($data)));
+        $data['id'] = $id;
+        $this->db->prepare("UPDATE material_requests SET {$sets} WHERE id = :id")->execute($data);
         $this->logAction('material_requests', $id, 'update', $before, $this->find('material_requests', $id));
     }
 

@@ -3,7 +3,13 @@ use App\Core\Url;
 
 $isCompletedView = ($viewMode ?? 'pending') === 'completed';
 $canManageMaterial = !empty($canManageMaterial);
+$canEditMaterialDetails = !empty($canEditMaterialDetails);
+$canInvoiceMaterial = !empty($canInvoiceMaterial);
+$canActOnMaterial = $canManageMaterial || $canEditMaterialDetails || $canInvoiceMaterial;
 $statusOptions = ['A Aguardar', 'Em Produção', 'A Aguardar Material', 'Concluído', 'Cancelado'];
+if ($canInvoiceMaterial) {
+    $statusOptions[] = 'Faturado';
+}
 $departmentOptions = ['Desenho técnico 3D', 'Tornearia', 'Desenho técnico 3D e Tornearia'];
 ?>
 <div class="page-head material-head">
@@ -37,13 +43,13 @@ $departmentOptions = ['Desenho técnico 3D', 'Tornearia', 'Desenho técnico 3D e
 <?php endif; ?>
 
 <div class="data-shell"><div class="table-responsive"><table class="table modern-table align-middle material-table">
-<thead><tr><th>Estado</th><th>Criado</th><th>Responsável</th><th>Departamento solicitado</th><th>Produto</th><th>Operação</th><th>Qtd</th><th>Qtd concluída</th><th>Urgência</th><th>Data entrega</th><th>Observações</th><th>Ficheiro</th><?php if($canManageMaterial): ?><th>Ações</th><?php endif; ?></tr></thead>
+<thead><tr><th>Estado</th><th>Criado</th><th>Responsável</th><th>Departamento solicitado</th><th>Produto</th><th>Operação</th><th>Qtd</th><th>Qtd concluída</th><th>Urgência</th><th>Data entrega</th><th>Observações</th><th>Ficheiro</th><?php if($canActOnMaterial): ?><th>Ações</th><?php endif; ?></tr></thead>
 <tbody>
 <?php foreach($rows as $row): ?>
 <tr>
 <td><span class="badge status-badge material-status"><?= htmlspecialchars($row['status']) ?></span></td><td><?= htmlspecialchars(date('d/m/Y H:i', strtotime($row['created_at']))) ?></td><td><?= htmlspecialchars($row['responsible']) ?></td><td><span class="pill"><?= htmlspecialchars($row['department']) ?></span></td><td><?= htmlspecialchars($row['product']) ?></td><td><?= htmlspecialchars($row['operation']) ?></td><td><?= htmlspecialchars($row['quantity']) ?></td><td><?= htmlspecialchars($row['completed_quantity']) ?></td><td><?= str_repeat('<i class="bi bi-flag"></i>', (int)$row['urgency']) ?></td><td><?= htmlspecialchars(date('d/m/Y', strtotime($row['due_date']))) ?></td><td><?= htmlspecialchars($row['notes'] ?? '') ?></td><td><?= htmlspecialchars($row['attachment_name'] ?? '') ?></td>
-<?php if($canManageMaterial): ?><td><form method="post" action="<?= Url::page('material_status') ?>" class="material-status-form"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><select class="form-select form-select-sm" name="status"><?php foreach($statusOptions as $status): ?><option value="<?= htmlspecialchars($status) ?>" <?= $row['status']===$status?'selected':'' ?>><?= htmlspecialchars($status) ?></option><?php endforeach; ?></select><input class="form-control form-control-sm" name="completed_quantity" type="number" min="0" step="0.01" value="<?= htmlspecialchars($row['completed_quantity']) ?>" title="Quantidade concluída"><button class="btn btn-primary btn-sm" title="Guardar"><i class="bi bi-check-lg"></i></button></form></td><?php endif; ?>
+<?php if($canActOnMaterial): ?><td><form method="post" action="<?= Url::page('material_status') ?>" class="material-status-form"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><?php if($canManageMaterial || $canInvoiceMaterial): ?><select class="form-select form-select-sm" name="status"><?php $rowStatusIncluded = false; foreach($statusOptions as $status): if (!$canManageMaterial && $status !== 'Faturado' && $status !== $row['status']) continue; $rowStatusIncluded = $rowStatusIncluded || $status === $row['status']; ?><option value="<?= htmlspecialchars($status) ?>" <?= $row['status']===$status?'selected':'' ?>><?= $status === 'Faturado' ? '✓ Faturado' : htmlspecialchars($status) ?></option><?php endforeach; if(!$rowStatusIncluded): ?><option value="<?= htmlspecialchars($row['status']) ?>" selected><?= htmlspecialchars($row['status']) ?></option><?php endif; ?></select><?php else: ?><input type="hidden" name="status" value="<?= htmlspecialchars($row['status']) ?>"><?php endif; ?><input class="form-control form-control-sm" name="completed_quantity" type="number" min="0" step="0.01" value="<?= htmlspecialchars($row['completed_quantity']) ?>" title="Quantidade concluída" <?= $canManageMaterial ? '' : 'readonly' ?>><?php if($canEditMaterialDetails): ?><input class="form-control form-control-sm" name="due_date" type="date" value="<?= htmlspecialchars($row['due_date']) ?>" title="Data de entrega"><input class="form-control form-control-sm material-notes-input" name="notes" value="<?= htmlspecialchars($row['notes'] ?? '') ?>" title="Observações" placeholder="Observações"><?php endif; ?><button class="btn btn-primary btn-sm" title="Guardar"><i class="bi bi-check-lg"></i></button></form></td><?php endif; ?>
 </tr>
 <?php endforeach; ?>
-<?php if(!$rows): ?><tr><td colspan="<?= $canManageMaterial ? 13 : 12 ?>" class="text-center text-muted py-5">Sem pedidos nesta vista.</td></tr><?php endif; ?>
+<?php if(!$rows): ?><tr><td colspan="<?= $canActOnMaterial ? 13 : 12 ?>" class="text-center text-muted py-5">Sem pedidos nesta vista.</td></tr><?php endif; ?>
 </tbody></table></div></div>
