@@ -13,8 +13,8 @@ $purchaseHistories = $purchaseHistories ?? [];
         <p>Registe pedidos de compra com artigo, quantidade, link e urgência, acompanhando o estado até à entrega.</p>
     </div>
     <div class="btn-cluster">
-        <a class="btn <?= $isCompletedView ? 'btn-light' : 'btn-dark' ?>" href="<?= Url::page('purchases') ?>&view=pending"><i class="bi bi-list-task"></i> Ativas</a>
-        <a class="btn <?= $isCompletedView ? 'btn-dark' : 'btn-light' ?>" href="<?= Url::page('purchases') ?>&view=completed"><i class="bi bi-check2-circle"></i> Fechadas</a>
+        <a class="btn <?= $isCompletedView ? 'btn-light' : 'btn-dark' ?>" href="<?= Url::page('purchases', ['view'=>'pending']) ?>"><i class="bi bi-list-task"></i> Ativas</a>
+        <a class="btn <?= $isCompletedView ? 'btn-dark' : 'btn-light' ?>" href="<?= Url::page('purchases', ['view'=>'completed']) ?>"><i class="bi bi-check2-circle"></i> Fechadas</a>
     </div>
 </div>
 
