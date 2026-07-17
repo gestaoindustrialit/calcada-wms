@@ -118,6 +118,87 @@ class AppController extends Controller
     }
 
     public function reports(): void { $user = Auth::user(); $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam($user), 'currentUser'=>$user]); }
+
+    public function material(): void
+    {
+        $user = Auth::user();
+        $requestedView = $_GET['view'] ?? 'pending';
+        $viewMode = in_array($requestedView, ['pending', 'completed', 'billed'], true) ? $requestedView : 'pending';
+        $this->view('material/index', ['title'=>'Material', 'rows'=>$this->repo->materialRequests($viewMode), 'viewMode'=>$viewMode, 'currentUser'=>$user, 'canManageMaterial'=>$this->canManageMaterial($user), 'canEditMaterialDetails'=>$this->canEditMaterialDetails($user), 'canInvoiceMaterial'=>$this->canInvoiceMaterial($user)]);
+    }
+
+    public function saveMaterial(): void
+    {
+        $user = Auth::user();
+        $data = array_intersect_key($_POST, array_flip(['responsible','department','product','operation','quantity','urgency','due_date','notes']));
+        $data['requester_name'] = $user['name'] ?? '';
+        $data['requester_team'] = $user['team'] ?? '';
+        $data['status'] = 'A Aguardar';
+        $data['completed_quantity'] = 0;
+        [$data['attachment_name'], $data['attachment_path']] = $this->storeMaterialAttachment($_FILES['attachment'] ?? null);
+        $data['billed'] = 0;
+        $this->repo->insert('material_requests', $data);
+        $this->redirect(Url::page('material'));
+    }
+
+
+    public function materialDownload(): void
+    {
+        $request = $this->repo->find('material_requests', (int)($_GET['id'] ?? 0));
+        $path = $request['attachment_path'] ?? '';
+        $name = $request['attachment_name'] ?? 'ficheiro';
+        if (!$request || !$path) {
+            http_response_code(404);
+            exit('Ficheiro não encontrado.');
+        }
+        $baseDir = realpath(dirname(__DIR__, 2) . '/data/material_uploads');
+        $filePath = realpath(dirname(__DIR__, 2) . '/' . $path);
+        if (!$baseDir || !$filePath || !str_starts_with($filePath, $baseDir) || !is_file($filePath)) {
+            http_response_code(404);
+            exit('Ficheiro não encontrado.');
+        }
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . basename($name) . '"');
+        header('Content-Length: ' . filesize($filePath));
+        readfile($filePath);
+        exit;
+    }
+
+    public function materialStatus(): void
+    {
+        $user = Auth::user();
+        $id = (int)($_POST['id'] ?? 0);
+        $request = $this->repo->find('material_requests', $id);
+        if (($_POST['material_action'] ?? '') === 'delete') {
+            if ($this->canManageMaterial($user)) {
+                $this->repo->delete('material_requests', $id);
+                $_SESSION['flash'] = 'Pedido de material eliminado.';
+            }
+            $this->redirect(Url::page('material'));
+        }
+        $status = (string)($_POST['status'] ?? '');
+        $data = [];
+        if ($status !== '' && $this->canManageMaterial($user)) {
+            $data['status'] = $status;
+            $data['completed_quantity'] = max((float)($_POST['completed_quantity'] ?? 0), 0);
+            if ($status === 'Concluído' && ($request['status'] ?? '') !== 'Concluído') {
+                $data['due_date'] = date('Y-m-d');
+            }
+        }
+        if ($this->canEditMaterialDetails($user)) {
+            $data['executor_notes'] = trim((string)($_POST['executor_notes'] ?? ''));
+        }
+        if ($this->canInvoiceMaterial($user)) {
+            $data['billed'] = isset($_POST['billed']) ? 1 : 0;
+        }
+        if ($data) {
+            $this->repo->updateMaterialRequestWorkflow($id, $data);
+        }
+        $updated = $this->repo->find('material_requests', $id);
+        $targetView = !empty($updated['billed']) ? 'billed' : (($updated['status'] ?? '') === 'Concluído' ? 'completed' : 'pending');
+        $this->redirect(Url::page('material') . '&view=' . $targetView);
+    }
+
     private function crud(string $table, array $fields, string $view, string $title, array $extraData = []): void
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -230,10 +311,55 @@ class AppController extends Controller
         $this->redirect(Url::page('requests'));
     }
 
+
+    private function storeMaterialAttachment(?array $file): array
+    {
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return [null, null];
+        }
+        $uploadDir = dirname(__DIR__, 2) . '/data/material_uploads';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0775, true);
+        }
+        $originalName = basename((string)$file['name']);
+        $extension = pathinfo($originalName, PATHINFO_EXTENSION);
+        $storedName = bin2hex(random_bytes(12)) . ($extension ? '.' . $extension : '');
+        $target = $uploadDir . '/' . $storedName;
+        if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
+            return [$originalName, null];
+        }
+        return [$originalName, 'data/material_uploads/' . $storedName];
+    }
+
     private function canManageRequests(?array $user = null): bool
     {
         $role = strtolower((string)($user['role'] ?? ''));
         return in_array($role, ['admin', 'compras'], true);
+    }
+
+    private function canManageMaterial(?array $user = null): bool
+    {
+        $role = strtolower((string)($user['role'] ?? ''));
+        return $role === 'admin' || $this->isMaterialTeam($user);
+    }
+
+    private function canEditMaterialDetails(?array $user = null): bool
+    {
+        $role = strtolower((string)($user['role'] ?? ''));
+        return in_array($role, ['admin', 'financeiro'], true) || $this->isMaterialTeam($user);
+    }
+
+    private function canInvoiceMaterial(?array $user = null): bool
+    {
+        $role = strtolower((string)($user['role'] ?? ''));
+        $team = strtolower((string)($user['team'] ?? ''));
+        return $role === 'admin' || $role === 'financeiro' || str_contains($team, 'financeiro');
+    }
+
+    private function isMaterialTeam(?array $user = null): bool
+    {
+        $team = strtolower((string)($user['team'] ?? ''));
+        return str_contains($team, 'tornearia') || str_contains($team, 'desenho técnico') || str_contains($team, 'desenho tecnico');
     }
 
     private function ensureChiefAllowed(): void

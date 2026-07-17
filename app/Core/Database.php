@@ -39,6 +39,11 @@ class Database
         self::ensureColumn('requests', 'delivered_quantity', 'REAL NOT NULL DEFAULT 0');
         self::ensureColumn('requests', 'request_group', 'TEXT');
         self::ensureColumn('inventory', 'location', "TEXT NOT NULL DEFAULT ''");
+        self::$pdo->exec("CREATE TABLE IF NOT EXISTS material_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, responsible TEXT NOT NULL, requester_name TEXT, requester_team TEXT, department TEXT NOT NULL, product TEXT NOT NULL, operation TEXT NOT NULL, quantity REAL NOT NULL, completed_quantity REAL NOT NULL DEFAULT 0, urgency INTEGER NOT NULL DEFAULT 1, due_date TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'A Aguardar', notes TEXT, executor_notes TEXT, attachment_name TEXT, attachment_path TEXT, billed INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+        self::ensureColumn('material_requests', 'executor_notes', 'TEXT');
+        self::ensureColumn('material_requests', 'attachment_path', 'TEXT');
+        self::ensureColumn('material_requests', 'billed', 'INTEGER NOT NULL DEFAULT 0');
+        self::$pdo->exec("UPDATE material_requests SET billed = 1, status = 'Concluído' WHERE status = 'Faturado'");
         self::$pdo->exec("CREATE TABLE IF NOT EXISTS action_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, table_name TEXT NOT NULL, row_id INTEGER NOT NULL, action TEXT NOT NULL, before_data TEXT, after_data TEXT, user_name TEXT, user_role TEXT, note TEXT, reverted INTEGER NOT NULL DEFAULT 0, reverted_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
         self::$pdo->exec("CREATE TABLE IF NOT EXISTS warehouse_locations (id INTEGER PRIMARY KEY AUTOINCREMENT, warehouse_id INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'Setor', code TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(warehouse_id) REFERENCES warehouses(id))");
         if ((int) self::$pdo->query('SELECT COUNT(*) FROM warehouse_locations')->fetchColumn() === 0 && (int) self::$pdo->query('SELECT COUNT(*) FROM warehouses')->fetchColumn() > 0) {
