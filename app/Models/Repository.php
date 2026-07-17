@@ -6,7 +6,7 @@ use App\Core\Model;
 
 class Repository extends Model
 {
-    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','purchase_requests','action_logs'];
+    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','action_logs'];
 
     public function all(string $table): array
     {
@@ -410,48 +410,16 @@ class Repository extends Model
         $this->delete('requests', $id);
     }
 
-    public function purchaseRequests(string $view = 'pending'): array
-    {
-        $completed = $view === 'completed';
-        $operator = $completed ? 'IN' : 'NOT IN';
-        $stmt = $this->db->prepare("SELECT purchase_requests.*, (SELECT COUNT(*) FROM purchase_request_history WHERE purchase_request_id = purchase_requests.id) AS history_count FROM purchase_requests WHERE status {$operator} ('Entregue','Cancelado') ORDER BY urgency DESC, created_at DESC");
-        $stmt->execute();
-        return $stmt->fetchAll();
-    }
-
-    public function purchaseHistories(array $purchaseIds): array
-    {
-        $purchaseIds = array_values(array_unique(array_filter(array_map('intval', $purchaseIds))));
-        if (!$purchaseIds) return [];
-        $placeholders = implode(',', array_fill(0, count($purchaseIds), '?'));
-        $stmt = $this->db->prepare("SELECT * FROM purchase_request_history WHERE purchase_request_id IN ({$placeholders}) ORDER BY changed_at DESC, id DESC");
-        $stmt->execute($purchaseIds);
-        $grouped = [];
-        foreach ($stmt->fetchAll() as $row) {
-            $grouped[(int)$row['purchase_request_id']][] = $row;
-        }
-        return $grouped;
-    }
-
-    public function setPurchaseStatus(int $id, string $status): void
-    {
-        $request = $this->find('purchase_requests', $id);
-        if (!$request || $request['status'] === $status) return;
-        $before = $request;
-        $user = Auth::user();
-        $this->db->prepare('UPDATE purchase_requests SET status = :status, status_changed_at = CURRENT_TIMESTAMP WHERE id = :id')->execute(['status'=>$status, 'id'=>$id]);
-        $this->db->prepare('INSERT INTO purchase_request_history (purchase_request_id,old_status,new_status,changed_by,changed_role) VALUES (:id,:old,:new,:by,:role)')->execute([
-            'id'=>$id, 'old'=>$before['status'] ?? '', 'new'=>$status, 'by'=>$user['name'] ?? 'Sistema', 'role'=>$user['role'] ?? '',
-        ]);
-        $this->logAction('purchase_requests', $id, 'update', $before, $this->find('purchase_requests', $id));
-    }
-
     public function materialRequests(string $view = 'pending'): array
     {
+        if ($view === 'billed') {
+            $stmt = $this->db->prepare('SELECT * FROM material_requests WHERE billed = 1 ORDER BY due_date DESC, created_at DESC');
+            $stmt->execute();
+            return $stmt->fetchAll();
+        }
         $completed = $view === 'completed';
-        $statuses = "'Concluído','Faturado'";
-        $operator = $completed ? 'IN' : 'NOT IN';
-        $stmt = $this->db->prepare("SELECT * FROM material_requests WHERE status {$operator} ({$statuses}) ORDER BY due_date ASC, urgency DESC, created_at DESC");
+        $operator = $completed ? '=' : '!=';
+        $stmt = $this->db->prepare("SELECT * FROM material_requests WHERE status {$operator} 'Concluído' AND billed = 0 ORDER BY due_date ASC, urgency DESC, created_at DESC");
         $stmt->execute();
         return $stmt->fetchAll();
     }

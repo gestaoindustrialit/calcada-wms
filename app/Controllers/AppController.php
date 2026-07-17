@@ -119,49 +119,11 @@ class AppController extends Controller
 
     public function reports(): void { $user = Auth::user(); $this->view('reports/index', ['title'=>'Gráficos','chartData'=>$this->repo->monthlyByTeam($user), 'currentUser'=>$user]); }
 
-
-    public function purchases(): void
-    {
-        $user = Auth::user();
-        $viewMode = ($_GET['view'] ?? 'pending') === 'completed' ? 'completed' : 'pending';
-        $rows = $this->repo->purchaseRequests($viewMode);
-        $this->view('purchases/index', ['title'=>'Compras', 'rows'=>$rows, 'viewMode'=>$viewMode, 'currentUser'=>$user, 'canManagePurchases'=>$this->canManageRequests($user), 'purchaseHistories'=>$this->repo->purchaseHistories(array_column($rows, 'id'))]);
-    }
-
-    public function savePurchase(): void
-    {
-        $user = Auth::user();
-        $data = array_intersect_key($_POST, array_flip(['article_name','quantity','urgency','link']));
-        $data['requester_name'] = $user['name'] ?? '';
-        $data['requester_team'] = $user['team'] ?? '';
-        $data['status'] = 'Pendente';
-        $this->repo->insert('purchase_requests', $data);
-        $this->redirect(Url::page('purchases'));
-    }
-
-    public function purchaseStatus(): void
-    {
-        if ($this->canManageRequests(Auth::user())) {
-            $status = (string)($_POST['status'] ?? '');
-            if (in_array($status, ['Pendente', 'Aprovado', 'Cancelado', 'Encomendado', 'Entregue'], true)) {
-                $this->repo->setPurchaseStatus((int)($_POST['id'] ?? 0), $status);
-            }
-        }
-        $this->redirect(Url::page('purchases'));
-    }
-
-    public function deletePurchase(): void
-    {
-        if ($this->canManageRequests(Auth::user())) {
-            $this->repo->delete('purchase_requests', (int)($_POST['id'] ?? 0));
-        }
-        $this->redirect(Url::page('purchases') . (($_POST['view'] ?? '') === 'completed' ? '&view=completed' : ''));
-    }
-
     public function material(): void
     {
         $user = Auth::user();
-        $viewMode = ($_GET['view'] ?? 'pending') === 'completed' ? 'completed' : 'pending';
+        $requestedView = $_GET['view'] ?? 'pending';
+        $viewMode = in_array($requestedView, ['pending', 'completed', 'billed'], true) ? $requestedView : 'pending';
         $this->view('material/index', ['title'=>'Material', 'rows'=>$this->repo->materialRequests($viewMode), 'viewMode'=>$viewMode, 'currentUser'=>$user, 'canManageMaterial'=>$this->canManageMaterial($user), 'canEditMaterialDetails'=>$this->canEditMaterialDetails($user), 'canInvoiceMaterial'=>$this->canInvoiceMaterial($user)]);
     }
 
@@ -173,9 +135,33 @@ class AppController extends Controller
         $data['requester_team'] = $user['team'] ?? '';
         $data['status'] = 'A Aguardar';
         $data['completed_quantity'] = 0;
-        $data['attachment_name'] = isset($_FILES['attachment']) && ($_FILES['attachment']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK ? basename((string)$_FILES['attachment']['name']) : null;
+        [$data['attachment_name'], $data['attachment_path']] = $this->storeMaterialAttachment($_FILES['attachment'] ?? null);
+        $data['billed'] = 0;
         $this->repo->insert('material_requests', $data);
         $this->redirect(Url::page('material'));
+    }
+
+
+    public function materialDownload(): void
+    {
+        $request = $this->repo->find('material_requests', (int)($_GET['id'] ?? 0));
+        $path = $request['attachment_path'] ?? '';
+        $name = $request['attachment_name'] ?? 'ficheiro';
+        if (!$request || !$path) {
+            http_response_code(404);
+            exit('Ficheiro não encontrado.');
+        }
+        $baseDir = realpath(dirname(__DIR__, 2) . '/data/material_uploads');
+        $filePath = realpath(dirname(__DIR__, 2) . '/' . $path);
+        if (!$baseDir || !$filePath || !str_starts_with($filePath, $baseDir) || !is_file($filePath)) {
+            http_response_code(404);
+            exit('Ficheiro não encontrado.');
+        }
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . basename($name) . '"');
+        header('Content-Length: ' . filesize($filePath));
+        readfile($filePath);
+        exit;
     }
 
     public function materialStatus(): void
@@ -183,11 +169,7 @@ class AppController extends Controller
         $user = Auth::user();
         $status = (string)($_POST['status'] ?? '');
         $data = [];
-        if ($status === 'Faturado') {
-            if ($this->canInvoiceMaterial($user)) {
-                $data['status'] = 'Faturado';
-            }
-        } elseif ($status !== '' && $this->canManageMaterial($user)) {
+        if ($status !== '' && $this->canManageMaterial($user)) {
             $data['status'] = $status;
             $data['completed_quantity'] = max((float)($_POST['completed_quantity'] ?? 0), 0);
         }
@@ -195,11 +177,16 @@ class AppController extends Controller
             $data['due_date'] = (string)($_POST['due_date'] ?? '');
             $data['notes'] = trim((string)($_POST['notes'] ?? ''));
         }
-        if ($data) {
-            $this->repo->updateMaterialRequestWorkflow((int)($_POST['id'] ?? 0), $data);
+        if ($this->canInvoiceMaterial($user)) {
+            $data['billed'] = isset($_POST['billed']) ? 1 : 0;
         }
-        $completedStatuses = ['Concluído', 'Faturado'];
-        $this->redirect(Url::page('material') . (in_array($data['status'] ?? '', $completedStatuses, true) ? '&view=completed' : ''));
+        $id = (int)($_POST['id'] ?? 0);
+        if ($data) {
+            $this->repo->updateMaterialRequestWorkflow($id, $data);
+        }
+        $updated = $this->repo->find('material_requests', $id);
+        $targetView = !empty($updated['billed']) ? 'billed' : (($updated['status'] ?? '') === 'Concluído' ? 'completed' : 'pending');
+        $this->redirect(Url::page('material') . '&view=' . $targetView);
     }
 
     private function crud(string $table, array $fields, string $view, string $title, array $extraData = []): void
@@ -312,6 +299,26 @@ class AppController extends Controller
             }
         }
         $this->redirect(Url::page('requests'));
+    }
+
+
+    private function storeMaterialAttachment(?array $file): array
+    {
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return [null, null];
+        }
+        $uploadDir = dirname(__DIR__, 2) . '/data/material_uploads';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0775, true);
+        }
+        $originalName = basename((string)$file['name']);
+        $extension = pathinfo($originalName, PATHINFO_EXTENSION);
+        $storedName = bin2hex(random_bytes(12)) . ($extension ? '.' . $extension : '');
+        $target = $uploadDir . '/' . $storedName;
+        if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
+            return [$originalName, null];
+        }
+        return [$originalName, 'data/material_uploads/' . $storedName];
     }
 
     private function canManageRequests(?array $user = null): bool
