@@ -16,8 +16,11 @@ $articleRows = $isEdit ? ($editLines ?: [[
     'notes' => '',
 ]];
 ?>
-<div class="page-head"><div><span class="eyebrow">Fluxo de armazém</span><h1>Requisição a armazém</h1><p>Pesquise artigos rapidamente, edite pedidos e faça entregas parciais até concluir.</p></div></div>
-<form method="post" action="<?= \App\Core\Url::page('request_save') ?>" class="quick-form mb-4" data-smart-form data-request-form>
+<div class="page-head request-page-head">
+    <div><span class="eyebrow">Fluxo de armazém</span><h1>Requisição a armazém</h1><p>Pesquise artigos rapidamente, edite pedidos e faça entregas parciais até concluir.</p></div>
+    <a class="btn btn-light page-head__action" href="#requestForm"><i class="bi bi-plus-lg"></i><span>Nova requisição</span></a>
+</div>
+<form id="requestForm" method="post" action="<?= \App\Core\Url::page('request_save') ?>" class="quick-form mb-4" data-smart-form data-request-form>
     <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>"><?php endif; ?>
     <div class="row g-3 mb-3">
         <div class="col-md-3">
