@@ -100,7 +100,7 @@ class AppController extends Controller
     {
         $this->ensureAdminAllowed();
         $filters = array_intersect_key($_GET, array_flip(['table_name','action']));
-        $this->view('logs/index', ['title'=>'Logs de ações', 'rows'=>$this->repo->actionLogs($filters), 'filters'=>$filters, 'tables'=>['users','warehouses','warehouse_locations','items','inventory','requests'], 'actions'=>['create','update','delete']]);
+        $this->view('logs/index', ['title'=>'Logs de ações', 'rows'=>$this->repo->actionLogs($filters), 'filters'=>$filters, 'tables'=>['users','warehouses','warehouse_locations','items','inventory','requests','purchase_requests'], 'actions'=>['create','update','delete']]);
     }
 
     public function logAction(): void
