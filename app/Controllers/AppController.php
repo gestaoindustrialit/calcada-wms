@@ -169,6 +169,13 @@ class AppController extends Controller
         $user = Auth::user();
         $id = (int)($_POST['id'] ?? 0);
         $request = $this->repo->find('material_requests', $id);
+        if (($_POST['material_action'] ?? '') === 'delete') {
+            if ($this->canManageMaterial($user)) {
+                $this->repo->delete('material_requests', $id);
+                $_SESSION['flash'] = 'Pedido de material eliminado.';
+            }
+            $this->redirect(Url::page('material'));
+        }
         $status = (string)($_POST['status'] ?? '');
         $data = [];
         if ($status !== '' && $this->canManageMaterial($user)) {
@@ -179,7 +186,7 @@ class AppController extends Controller
             }
         }
         if ($this->canEditMaterialDetails($user)) {
-            $data['notes'] = trim((string)($_POST['notes'] ?? ''));
+            $data['executor_notes'] = trim((string)($_POST['executor_notes'] ?? ''));
         }
         if ($this->canInvoiceMaterial($user)) {
             $data['billed'] = isset($_POST['billed']) ? 1 : 0;

@@ -39,7 +39,8 @@ class Database
         self::ensureColumn('requests', 'delivered_quantity', 'REAL NOT NULL DEFAULT 0');
         self::ensureColumn('requests', 'request_group', 'TEXT');
         self::ensureColumn('inventory', 'location', "TEXT NOT NULL DEFAULT ''");
-        self::$pdo->exec("CREATE TABLE IF NOT EXISTS material_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, responsible TEXT NOT NULL, requester_name TEXT, requester_team TEXT, department TEXT NOT NULL, product TEXT NOT NULL, operation TEXT NOT NULL, quantity REAL NOT NULL, completed_quantity REAL NOT NULL DEFAULT 0, urgency INTEGER NOT NULL DEFAULT 1, due_date TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'A Aguardar', notes TEXT, attachment_name TEXT, attachment_path TEXT, billed INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+        self::$pdo->exec("CREATE TABLE IF NOT EXISTS material_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, responsible TEXT NOT NULL, requester_name TEXT, requester_team TEXT, department TEXT NOT NULL, product TEXT NOT NULL, operation TEXT NOT NULL, quantity REAL NOT NULL, completed_quantity REAL NOT NULL DEFAULT 0, urgency INTEGER NOT NULL DEFAULT 1, due_date TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'A Aguardar', notes TEXT, executor_notes TEXT, attachment_name TEXT, attachment_path TEXT, billed INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+        self::ensureColumn('material_requests', 'executor_notes', 'TEXT');
         self::ensureColumn('material_requests', 'attachment_path', 'TEXT');
         self::ensureColumn('material_requests', 'billed', 'INTEGER NOT NULL DEFAULT 0');
         self::$pdo->exec("UPDATE material_requests SET billed = 1, status = 'Concluído' WHERE status = 'Faturado'");

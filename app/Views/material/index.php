@@ -74,15 +74,16 @@ $departmentOptions = ['Desenho técnico 3D', 'Tornearia', 'Desenho técnico 3D e
                 <div><label class="form-label">Qtd Entregue</label><input class="form-control" name="completed_quantity" type="number" min="0" step="0.01" value="<?= htmlspecialchars($row['completed_quantity']) ?>"></div>
                 <?php endif; ?>
                 <?php if($canEditMaterialDetails): ?>
-                <div class="material-edit-grid__full"><label class="form-label">Obs</label><textarea class="form-control" name="notes" rows="3" placeholder="Observações"><?= htmlspecialchars($row['notes'] ?? '') ?></textarea></div>
+                <div class="material-edit-grid__full"><label class="form-label">Obs. executantes</label><textarea class="form-control" name="executor_notes" rows="3"><?= htmlspecialchars($row['executor_notes'] ?? '') ?></textarea></div>
                 <?php endif; ?>
                 <?php if($canInvoiceMaterial): ?>
                 <div class="form-check material-modal-check"><input class="form-check-input" type="checkbox" name="billed" value="1" id="<?= $modalId ?>-billed" <?= !empty($row['billed']) ? 'checked' : '' ?>><label class="form-check-label" for="<?= $modalId ?>-billed">Faturado</label></div>
                 <?php endif; ?>
             </div>
             <div class="modal-footer">
+                <?php if($canManageMaterial): ?><button class="btn btn-outline-danger me-auto" name="material_action" value="delete" onclick="return confirm('Eliminar este pedido de material?')"><i class="bi bi-trash"></i> Eliminar</button><?php endif; ?>
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Guardar alterações</button>
+                <button class="btn btn-primary" name="material_action" value="save"><i class="bi bi-check-lg"></i> Guardar alterações</button>
             </div>
         </form>
     </div>

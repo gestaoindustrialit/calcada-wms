@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS material_requests (
     due_date TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'A Aguardar',
     notes TEXT,
+    executor_notes TEXT,
     attachment_name TEXT,
     attachment_path TEXT,
     billed INTEGER NOT NULL DEFAULT 0,
