@@ -288,3 +288,40 @@ body.modal-open .page-card { backdrop-filter: none; }
 .material-notes-input { min-width: 180px; }
 .material-table .bi-flag { color: #64748b; margin-right: .15rem; }
 @media (max-width: 768px) { .material-status-form { grid-template-columns: 1fr; min-width: 220px; } }
+
+.log-timeline { display: grid; gap: 1rem; }
+.log-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(226, 232, 240, .95);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, .07);
+}
+.log-card.is-reverted { opacity: .72; background: #f8fafc; }
+.log-card__main { display: flex; gap: .9rem; min-width: 0; }
+.log-icon { width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; border-radius: 15px; color: #fff; font-size: 1.1rem; }
+.log-icon--create { background: linear-gradient(135deg, #12b76a, #059669); }
+.log-icon--update { background: linear-gradient(135deg, #4f46e5, #2563eb); }
+.log-icon--delete { background: linear-gradient(135deg, #f04438, #b42318); }
+.log-card__content { min-width: 0; }
+.log-card__top { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; margin-bottom: .45rem; }
+.log-card h3 { margin: 0; font-size: 1.05rem; font-weight: 900; letter-spacing: -.025em; }
+.log-card p { margin: .35rem 0 0; color: var(--muted); font-size: .88rem; }
+.log-details { margin-top: .8rem; }
+.log-details summary { cursor: pointer; font-weight: 850; color: #3730a3; }
+.log-diff-grid { display: grid; gap: .45rem; margin-top: .65rem; }
+.log-diff-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 22px minmax(0, 1fr); gap: .55rem; align-items: start; padding: .6rem; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+.log-diff-row span { font-weight: 850; color: #344054; }
+.log-diff-row del, .log-diff-row ins { text-decoration: none; overflow-wrap: anywhere; }
+.log-diff-row del { color: #b42318; }
+.log-diff-row ins { color: #027a48; }
+.log-card__aside { display: grid; align-content: start; gap: .6rem; }
+.note-form { display: grid; gap: .45rem; }
+
+@media (max-width: 992px) {
+  .log-card { grid-template-columns: 1fr; }
+  .log-diff-row { grid-template-columns: 1fr; }
+}
