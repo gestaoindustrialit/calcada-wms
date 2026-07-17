@@ -65,7 +65,11 @@ class Repository extends Model
         $params = [];
         if (!empty($filters['table_name'])) { $where[] = 'table_name = :table_name'; $params['table_name'] = $filters['table_name']; }
         if (!empty($filters['action'])) { $where[] = 'action = :action'; $params['action'] = $filters['action']; }
-        $sql = 'SELECT * FROM action_logs' . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY created_at DESC, id DESC LIMIT 300';
+        if (($filters['q'] ?? '') !== '') {
+            $where[] = '(table_name LIKE :q OR action LIKE :q OR user_name LIKE :q OR user_role LIKE :q OR before_data LIKE :q OR after_data LIKE :q OR note LIKE :q)';
+            $params['q'] = '%' . trim((string)$filters['q']) . '%';
+        }
+        $sql = 'SELECT * FROM action_logs' . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY created_at DESC, id DESC LIMIT 500';
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
