@@ -89,3 +89,16 @@ CREATE TABLE IF NOT EXISTS material_requests (
     attachment_name TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+
+CREATE TABLE IF NOT EXISTS purchase_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    requester_name TEXT,
+    requester_team TEXT,
+    article_name TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    link TEXT,
+    urgency INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'Pendente',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

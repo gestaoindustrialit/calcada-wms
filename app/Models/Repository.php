@@ -6,7 +6,7 @@ use App\Core\Model;
 
 class Repository extends Model
 {
-    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','action_logs'];
+    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','purchase_requests','action_logs'];
 
     public function all(string $table): array
     {
@@ -404,6 +404,28 @@ class Repository extends Model
             return;
         }
         $this->delete('requests', $id);
+    }
+
+    public function purchaseRequests(string $view = 'pending'): array
+    {
+        $completed = $view === 'completed';
+        $operator = $completed ? 'IN' : 'NOT IN';
+        $stmt = $this->db->prepare("SELECT * FROM purchase_requests WHERE status {$operator} ('Entregue', 'Cancelado') ORDER BY urgency DESC, created_at DESC");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function setPurchaseRequestStatus(int $id, string $status): void
+    {
+        $allowed = ['Pendente', 'Aprovado', 'Cancelado', 'Encomendado', 'Entregue'];
+        if (!in_array($status, $allowed, true)) {
+            $status = 'Pendente';
+        }
+        $request = $this->find('purchase_requests', $id);
+        if (!$request) return;
+        $before = $request;
+        $this->db->prepare('UPDATE purchase_requests SET status = :status WHERE id = :id')->execute(['status'=>$status, 'id'=>$id]);
+        $this->logAction('purchase_requests', $id, 'update', $before, $this->find('purchase_requests', $id));
     }
 
     public function materialRequests(string $view = 'pending'): array
