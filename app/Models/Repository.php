@@ -6,7 +6,7 @@ use App\Core\Model;
 
 class Repository extends Model
 {
-    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','action_logs'];
+    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','action_logs'];
 
     public function all(string $table): array
     {
@@ -404,6 +404,31 @@ class Repository extends Model
             return;
         }
         $this->delete('requests', $id);
+    }
+
+    public function materialRequests(string $view = 'pending'): array
+    {
+        if ($view === 'billed') {
+            $stmt = $this->db->prepare('SELECT * FROM material_requests WHERE billed = 1 ORDER BY due_date DESC, created_at DESC');
+            $stmt->execute();
+            return $stmt->fetchAll();
+        }
+        $completed = $view === 'completed';
+        $operator = $completed ? '=' : '!=';
+        $stmt = $this->db->prepare("SELECT * FROM material_requests WHERE status {$operator} 'Concluído' AND billed = 0 ORDER BY due_date ASC, urgency DESC, created_at DESC");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function updateMaterialRequestWorkflow(int $id, array $data): void
+    {
+        $request = $this->find('material_requests', $id);
+        if (!$request || !$data) return;
+        $before = $request;
+        $sets = implode(',', array_map(fn($col) => "{$col} = :{$col}", array_keys($data)));
+        $data['id'] = $id;
+        $this->db->prepare("UPDATE material_requests SET {$sets} WHERE id = :id")->execute($data);
+        $this->logAction('material_requests', $id, 'update', $before, $this->find('material_requests', $id));
     }
 
     public function importItems(array $file, bool $withLocation = false): array
