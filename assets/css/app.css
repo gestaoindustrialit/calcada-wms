@@ -87,6 +87,7 @@ main.container-fluid { max-width: 1640px; padding-inline: 1.4rem; }
   width: 480px;
   height: 480px;
   background: radial-gradient(circle, rgba(255, 255, 255, .24), transparent 64%);
+  pointer-events: none;
 }
 
 .page-hero h1,
@@ -174,7 +175,7 @@ main.container-fluid { max-width: 1640px; padding-inline: 1.4rem; }
 .status-entregue { background: #ecfdf3 !important; color: #027a48 !important; }
 .status-cancelado { background: #fef3f2 !important; color: #b42318 !important; }
 
-.btn-cluster { display: flex; flex-wrap: wrap; gap: .42rem; align-items: center; }
+.btn-cluster { display: flex; flex-wrap: wrap; gap: .42rem; align-items: center; position: relative; z-index: 1; }
 .progress-wrap { min-width: 130px; }
 .progress-wrap span { font-size: .86rem; }
 .progress-wrap small,
