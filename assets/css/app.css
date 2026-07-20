@@ -439,3 +439,23 @@ body.modal-open .page-card { backdrop-filter: none; }
   .log-card__main { flex-direction: column; }
   .log-card__aside { grid-template-columns: 1fr; }
 }
+
+.maintenance-head h1,
+.maintenance-form .section-title h2 {
+    letter-spacing: -0.03em;
+}
+
+.maintenance-table td {
+    vertical-align: middle;
+}
+
+.maintenance-priority {
+    color: #f59e0b;
+    display: inline-flex;
+    gap: 0.12rem;
+    white-space: nowrap;
+}
+
+.maintenance-status {
+    background: linear-gradient(135deg, #0f766e, #2563eb);
+}

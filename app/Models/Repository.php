@@ -6,7 +6,7 @@ use App\Core\Model;
 
 class Repository extends Model
 {
-    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','action_logs'];
+    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','maintenance_requests','action_logs'];
 
     public function all(string $table): array
     {
@@ -433,6 +433,33 @@ class Repository extends Model
         $data['id'] = $id;
         $this->db->prepare("UPDATE material_requests SET {$sets} WHERE id = :id")->execute($data);
         $this->logAction('material_requests', $id, 'update', $before, $this->find('material_requests', $id));
+    }
+
+
+    public function maintenanceRequests(string $view = 'open'): array
+    {
+        $where = $view === 'closed' ? "WHERE status IN ('Concluído', 'Cancelado')" : "WHERE status NOT IN ('Concluído', 'Cancelado')";
+        $stmt = $this->db->prepare("SELECT * FROM maintenance_requests {$where} ORDER BY priority DESC, due_date ASC, created_at DESC");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function updateMaintenanceRequestWorkflow(int $id, array $data): void
+    {
+        $request = $this->find('maintenance_requests', $id);
+        if (!$request || !$data) return;
+        $before = $request;
+        $sets = implode(',', array_map(fn($col) => "{$col} = :{$col}", array_keys($data)));
+        $data['id'] = $id;
+        $this->db->prepare("UPDATE maintenance_requests SET {$sets} WHERE id = :id")->execute($data);
+        $this->logAction('maintenance_requests', $id, 'update', $before, $this->find('maintenance_requests', $id));
+    }
+
+    public function maintenanceTeamUsers(): array
+    {
+        $stmt = $this->db->prepare("SELECT id, name, email, role, team FROM users WHERE LOWER(team) LIKE :team OR LOWER(role) LIKE :role ORDER BY name ASC");
+        $stmt->execute(['team'=>'%manuten%', 'role'=>'%manuten%']);
+        return $stmt->fetchAll();
     }
 
     public function importItems(array $file, bool $withLocation = false): array

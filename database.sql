@@ -92,3 +92,20 @@ CREATE TABLE IF NOT EXISTS material_requests (
     billed INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+
+CREATE TABLE IF NOT EXISTS maintenance_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    asset TEXT NOT NULL,
+    location TEXT NOT NULL,
+    description TEXT,
+    requester_name TEXT,
+    requester_team TEXT,
+    assigned_to TEXT,
+    priority INTEGER NOT NULL DEFAULT 3,
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'Aberto',
+    delegation_notes TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
