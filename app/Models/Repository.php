@@ -172,7 +172,7 @@ class Repository extends Model
     public function roles(): array
     {
         $rows = $this->db->query("SELECT DISTINCT role FROM users WHERE TRIM(role) != '' ORDER BY role ASC")->fetchAll();
-        $roles = array_values(array_unique(array_filter(array_merge(['Admin', 'Chefe', 'Compras', 'Stock'], array_column($rows, 'role')))));
+        $roles = array_values(array_unique(array_filter(array_merge(['Admin', 'RH', 'Chefe', 'Compras', 'Stock'], array_column($rows, 'role')))));
         natcasesort($roles);
         return array_values($roles);
     }
@@ -332,7 +332,7 @@ class Repository extends Model
     {
         $where = '';
         $params = [];
-        if ($user && !in_array(strtolower((string)($user['role'] ?? '')), ['admin', 'compras'], true)) {
+        if ($user && !$this->canViewAllData($user) && strtolower((string)($user['role'] ?? '')) !== 'compras') {
             $where = 'WHERE requests.requester = :name';
             $params = ['name'=>$user['name'] ?? ''];
         }
@@ -417,7 +417,7 @@ class Repository extends Model
         $placeholders = implode(',', array_fill(0, count($closedStatuses), '?'));
         $where = $view === 'completed' ? "status IN ({$placeholders})" : "status NOT IN ({$placeholders})";
         $params = $closedStatuses;
-        if ($user && $this->isChief($user)) {
+        if ($user && !$this->canViewAllData($user)) {
             $where .= ' AND requester_name = ?';
             $params[] = $user['name'] ?? '';
         }
@@ -450,17 +450,19 @@ class Repository extends Model
         }
     }
 
-    public function materialRequests(string $view = 'pending'): array
+    public function materialRequests(string $view = 'pending', ?array $user = null): array
     {
+        $scope = $this->canViewAllData($user) ? '' : ' AND requester_name = :requester_name';
+        $params = $scope ? ['requester_name'=>$user['name'] ?? ''] : [];
         if ($view === 'billed') {
-            $stmt = $this->db->prepare('SELECT * FROM material_requests WHERE billed = 1 ORDER BY due_date DESC, created_at DESC');
-            $stmt->execute();
+            $stmt = $this->db->prepare('SELECT * FROM material_requests WHERE billed = 1' . $scope . ' ORDER BY due_date DESC, created_at DESC');
+            $stmt->execute($params);
             return $stmt->fetchAll();
         }
         $completed = $view === 'completed';
         $operator = $completed ? '=' : '!=';
-        $stmt = $this->db->prepare("SELECT * FROM material_requests WHERE status {$operator} 'Concluído' AND billed = 0 ORDER BY due_date ASC, urgency DESC, created_at DESC");
-        $stmt->execute();
+        $stmt = $this->db->prepare("SELECT * FROM material_requests WHERE status {$operator} 'Concluído' AND billed = 0{$scope} ORDER BY due_date ASC, urgency DESC, created_at DESC");
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
@@ -476,11 +478,16 @@ class Repository extends Model
     }
 
 
-    public function maintenanceRequests(string $view = 'open'): array
+    public function maintenanceRequests(string $view = 'open', ?array $user = null): array
     {
         $where = $view === 'closed' ? "WHERE status IN ('Concluído', 'Cancelado')" : "WHERE status NOT IN ('Concluído', 'Cancelado')";
+        $params = [];
+        if (!$this->canViewAllData($user)) {
+            $where .= ' AND requester_name = :requester_name';
+            $params['requester_name'] = $user['name'] ?? '';
+        }
         $stmt = $this->db->prepare("SELECT * FROM maintenance_requests {$where} ORDER BY priority DESC, due_date ASC, created_at DESC");
-        $stmt->execute();
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
@@ -732,7 +739,7 @@ class Repository extends Model
 
     public function spendingByPeriod(?array $user = null): array
     {
-        $filter = $this->isChief($user) ? 'AND requests.requester = :name' : '';
+        $filter = !$this->canViewAllData($user) ? 'AND requests.requester = :name' : '';
         $params = $filter ? ['name'=>$user['name'] ?? ''] : [];
         $sql = "SELECT
             COALESCE(SUM(CASE WHEN date(requests.created_at) >= date('now','-6 days') THEN requests.quantity*items.weighted_price END),0) week,
@@ -744,7 +751,7 @@ class Repository extends Model
 
     public function articleSpend(?array $user = null): array
     {
-        $filter = $this->isChief($user) ? 'WHERE requests.requester = :name' : '';
+        $filter = !$this->canViewAllData($user) ? 'WHERE requests.requester = :name' : '';
         $stmt = $this->db->prepare("SELECT items.name item, ROUND(SUM(requests.quantity*items.weighted_price),2) total FROM requests JOIN items ON items.id=requests.item_id {$filter} GROUP BY items.id ORDER BY total DESC LIMIT 8");
         $stmt->execute($filter ? ['name'=>$user['name'] ?? ''] : []); return $stmt->fetchAll();
     }
@@ -752,7 +759,7 @@ class Repository extends Model
 
     public function monthlyByTeam(?array $user = null): array
     {
-        $filter = $this->isChief($user) ? 'WHERE requests.requester = :name' : '';
+        $filter = !$this->canViewAllData($user) ? 'WHERE requests.requester = :name' : '';
         $stmt = $this->db->prepare("SELECT strftime('%Y-%m', requests.created_at) AS month, requests.team,
             ROUND(SUM(requests.quantity * items.weighted_price),2) AS total
             FROM requests JOIN items ON items.id=requests.item_id
@@ -767,9 +774,10 @@ class Repository extends Model
         return ['users'=>(int)$this->db->query('SELECT COUNT(*) FROM users')->fetchColumn(),'warehouses'=>(int)$this->db->query('SELECT COUNT(*) FROM warehouses')->fetchColumn(),'items'=>(int)$this->db->query('SELECT COUNT(*) FROM items')->fetchColumn(),'stock_value'=>(float)$this->db->query('SELECT COALESCE(SUM(inventory.quantity*items.weighted_price),0) FROM inventory JOIN items ON items.id=inventory.item_id')->fetchColumn(),'spending'=>$this->spendingByPeriod($user),'article_spend'=>$this->articleSpend($user)];
     }
 
-    private function isChief(?array $user = null): bool
+    private function canViewAllData(?array $user = null): bool
     {
-        return strtolower((string)($user['role'] ?? '')) === 'chefe';
+        $role = strtolower((string)($user['role'] ?? ''));
+        return in_array($role, ['admin', 'rh'], true);
     }
 
     private function guardTable(string $table): void

@@ -3,6 +3,7 @@ use App\Core\Url;
 
 $isClosedView = ($viewMode ?? 'open') === 'closed';
 $canDelegateMaintenance = !empty($canDelegateMaintenance);
+$canManageMaintenance = !empty($canManageMaintenance);
 $statusOptions = ['Aberto', 'Delegado', 'Em execução', 'A aguardar peças', 'Concluído', 'Cancelado'];
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
@@ -66,15 +67,15 @@ unset($_SESSION['flash']);
     <div class="modal-dialog modal-dialog-centered">
         <form method="post" action="<?= Url::page('maintenance_status') ?>" class="modal-content">
             <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
-            <div class="modal-header"><div><h5 class="modal-title">Delegar manutenção</h5><small><?= htmlspecialchars($row['title']) ?> · <?= htmlspecialchars($row['asset']) ?></small></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+            <div class="modal-header"><div><h5 class="modal-title"><?= $canManageMaintenance ? 'Editar manutenção' : 'Delegar manutenção' ?></h5><small><?= htmlspecialchars($row['title']) ?> · <?= htmlspecialchars($row['asset']) ?></small></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
             <div class="modal-body row g-3">
                 <div class="col-md-6"><label class="form-label">Responsável</label><input class="form-control" name="assigned_to" list="maintenance-users" value="<?= htmlspecialchars($row['assigned_to'] ?? '') ?>"></div>
-                <div class="col-md-6"><label class="form-label">Estado</label><select class="form-select" name="status"><?php foreach($statusOptions as $status): ?><option value="<?= htmlspecialchars($status) ?>" <?= $row['status']===$status?'selected':'' ?>><?= htmlspecialchars($status) ?></option><?php endforeach; ?></select></div>
+                <?php if($canManageMaintenance): ?><div class="col-md-6"><label class="form-label">Estado</label><select class="form-select" name="status"><?php foreach($statusOptions as $status): ?><option value="<?= htmlspecialchars($status) ?>" <?= $row['status']===$status?'selected':'' ?>><?= htmlspecialchars($status) ?></option><?php endforeach; ?></select></div>
                 <div class="col-md-6"><label class="form-label">Prioridade</label><select class="form-select" name="priority"><?php for($i=1;$i<=5;$i++): ?><option value="<?= $i ?>" <?= (int)$row['priority']===$i?'selected':'' ?>><?= $i ?></option><?php endfor; ?></select></div>
                 <div class="col-md-6"><label class="form-label">Data limite</label><input class="form-control" name="due_date" type="date" value="<?= htmlspecialchars($row['due_date'] ?? '') ?>"></div>
-                <div class="col-12"><label class="form-label">Notas de delegação</label><textarea class="form-control" name="delegation_notes" rows="3"><?= htmlspecialchars($row['delegation_notes'] ?? '') ?></textarea></div>
+                <div class="col-12"><label class="form-label">Notas de delegação</label><textarea class="form-control" name="delegation_notes" rows="3"><?= htmlspecialchars($row['delegation_notes'] ?? '') ?></textarea></div><?php endif; ?>
             </div>
-            <div class="modal-footer"><button class="btn btn-outline-danger me-auto" name="maintenance_action" value="delete" onclick="return confirm('Eliminar este pedido de manutenção?')"><i class="bi bi-trash"></i> Eliminar</button><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" name="maintenance_action" value="save"><i class="bi bi-check-lg"></i> Guardar</button></div>
+            <div class="modal-footer"><?php if($canManageMaintenance): ?><button class="btn btn-outline-danger me-auto" name="maintenance_action" value="delete" onclick="return confirm('Eliminar este pedido de manutenção?')"><i class="bi bi-trash"></i> Eliminar</button><?php endif; ?><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" name="maintenance_action" value="save"><i class="bi bi-check-lg"></i> Guardar</button></div>
         </form>
     </div>
 </div>

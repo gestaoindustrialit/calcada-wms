@@ -6,6 +6,7 @@ $isBilledView = ($viewMode ?? 'pending') === 'billed';
 $canManageMaterial = !empty($canManageMaterial);
 $canEditMaterialDetails = !empty($canEditMaterialDetails);
 $canInvoiceMaterial = !empty($canInvoiceMaterial);
+$canDeleteMaterial = !empty($canDeleteMaterial);
 $canActOnMaterial = $canManageMaterial || $canEditMaterialDetails || $canInvoiceMaterial;
 $statusOptions = ['A Aguardar', 'Em Produção', 'A Aguardar Material', 'Concluído', 'Cancelado'];
 $departmentOptions = ['Desenho técnico 3D', 'Tornearia', 'Desenho técnico 3D e Tornearia'];
@@ -81,7 +82,7 @@ $departmentOptions = ['Desenho técnico 3D', 'Tornearia', 'Desenho técnico 3D e
                 <?php endif; ?>
             </div>
             <div class="modal-footer">
-                <?php if($canManageMaterial): ?><button class="btn btn-outline-danger me-auto" name="material_action" value="delete" onclick="return confirm('Eliminar este pedido de material?')"><i class="bi bi-trash"></i> Eliminar</button><?php endif; ?>
+                <?php if($canDeleteMaterial): ?><button class="btn btn-outline-danger me-auto" name="material_action" value="delete" onclick="return confirm('Eliminar este pedido de material?')"><i class="bi bi-trash"></i> Eliminar</button><?php endif; ?>
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
                 <button class="btn btn-primary" name="material_action" value="save"><i class="bi bi-check-lg"></i> Guardar alterações</button>
             </div>
