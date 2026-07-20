@@ -6,6 +6,7 @@ spl_autoload_register(function ($class) {
 });
 
 use App\Core\Auth;
+use App\Core\Access;
 use App\Core\Url;
 use App\Controllers\AppController;
 
@@ -14,6 +15,10 @@ $page = $_GET['page'] ?? 'dashboard';
 $publicRoutes = ['login'];
 if (!in_array($page, $publicRoutes, true) && !Auth::check()) {
     header('Location: ' . Url::page('login'));
+    exit;
+}
+if (!in_array($page, $publicRoutes, true) && !Access::canAccessPage(Auth::user(), $page)) {
+    header('Location: ' . Url::page('dashboard'));
     exit;
 }
 $routes = [

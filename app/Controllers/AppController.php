@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Auth;
+use App\Core\Access;
 use App\Core\Controller;
 use App\Core\Url;
 use App\Models\Repository;
@@ -41,7 +42,7 @@ class AppController extends Controller
         }
         $this->redirect(Url::page('dashboard'));
     }
-    public function users(): void { $this->ensureChiefAllowed(); $this->crud('users', ['name','email','role','team','password_hash'], 'users/index', 'Utilizadores', ['roles'=>$this->repo->roles()]); }
+    public function users(): void { $this->ensureAdminAllowed(); $this->crud('users', ['name','email','role','team','password_hash'], 'users/index', 'Utilizadores', ['roles'=>$this->repo->roles()]); }
     public function warehouses(): void
     {
         $this->ensureChiefAllowed();
@@ -492,14 +493,12 @@ class AppController extends Controller
 
     private function canViewAllData(?array $user = null): bool
     {
-        $role = strtolower((string)($user['role'] ?? ''));
-        return in_array($role, ['admin', 'rh'], true);
+        return Access::canViewAllData($user);
     }
 
     private function isMaterialTeam(?array $user = null): bool
     {
-        $team = strtolower((string)($user['team'] ?? ''));
-        return str_contains($team, 'tornearia') || str_contains($team, 'desenho técnico') || str_contains($team, 'desenho tecnico');
+        return Access::isMaterialTeam($user);
     }
 
     private function ensureChiefAllowed(): void
