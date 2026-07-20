@@ -53,7 +53,7 @@ class Access
             return ['dashboard','material','material_status','material_download','reports','export_excel','export_pdf','logout'];
         }
         if (self::isMaterialTeam($user)) {
-            return ['dashboard','material','material_save','material_status','material_download','logout'];
+            return ['dashboard','requests','request_save','purchases','purchase_save','material','material_save','material_status','material_download','maintenance','maintenance_save','logout'];
         }
         if (self::isMaintenanceTeam($user)) {
             return ['dashboard','maintenance','maintenance_save','maintenance_status','logout'];
