@@ -27,6 +27,7 @@ $routes = [
     'inventory'=>fn()=> $controller->inventory(),
     'inventory_save'=>fn()=> $controller->saveInventory(),
     'requests'=>fn()=> $controller->requests(),
+    'purchases'=>fn()=> $controller->purchases(),
     'material'=>fn()=> $controller->material(),
     'maintenance'=>fn()=> $controller->maintenance(),
     'maintenance_save'=>fn()=> $controller->saveMaintenance(),
