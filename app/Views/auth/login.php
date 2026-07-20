@@ -18,7 +18,6 @@
                     </div>
                     <button class="btn btn-primary w-100" type="submit" title="Entrar" aria-label="Entrar"><i class="bi bi-box-arrow-in-right"></i></button>
                 </form>
-                <p class="small text-muted mt-3 mb-0">Acesso inicial: <strong>admin</strong> / <strong>admin123</strong>. Pode alterar com as variáveis <code>WMS_ADMIN_USER</code> e <code>WMS_ADMIN_PASSWORD</code>.</p>
             </div>
         </div>
     </div>
