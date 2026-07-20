@@ -1,7 +1,7 @@
-<?php $flash = $_SESSION['flash'] ?? null; unset($_SESSION['flash']); ?>
-<div class="page-head"><div><span class="eyebrow">Dashboard</span><h1>Painel de controlo</h1><p><?= ($currentUser['role'] ?? '') === 'Chefe' ? 'Visão filtrada aos seus pedidos e requisições.' : 'Visão global operacional do WMS.' ?></p></div></div>
+<?php $flash = $_SESSION['flash'] ?? null; unset($_SESSION['flash']); $canViewAllData = in_array(strtolower((string)($currentUser['role'] ?? '')), ['admin', 'rh'], true); ?>
+<div class="page-head"><div><span class="eyebrow">Dashboard</span><h1>Painel de controlo</h1><p><?= $canViewAllData ? 'Visão global operacional do WMS.' : 'Visão filtrada aos seus pedidos e requisições.' ?></p></div></div>
 <?php if ($flash): ?><div class="alert alert-info"><?= htmlspecialchars($flash) ?></div><?php endif; ?>
-<?php if (($currentUser['role'] ?? '') !== 'Chefe'): ?><div class="row g-3 mb-4"><?php foreach([['Utilizadores',$stats['users']],['Armazéns',$stats['warehouses']],['Artigos',$stats['items']],['Valor stock','€ '.number_format($stats['stock_value'],2,',','.')]] as $m): ?><div class="col-6 col-lg-3"><div class="card metric"><div class="card-body"><small><?= $m[0] ?></small><h2><?= $m[1] ?></h2></div></div></div><?php endforeach; ?></div><?php endif; ?>
+<?php if ($canViewAllData): ?><div class="row g-3 mb-4"><?php foreach([['Utilizadores',$stats['users']],['Armazéns',$stats['warehouses']],['Artigos',$stats['items']],['Valor stock','€ '.number_format($stats['stock_value'],2,',','.')]] as $m): ?><div class="col-6 col-lg-3"><div class="card metric"><div class="card-body"><small><?= $m[0] ?></small><h2><?= $m[1] ?></h2></div></div></div><?php endforeach; ?></div><?php endif; ?>
 
 <?php if (strtolower((string)($currentUser['role'] ?? '')) === 'admin'): ?>
 <div class="quick-form danger-zone mb-4">

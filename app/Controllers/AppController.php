@@ -103,11 +103,12 @@ class AppController extends Controller
         $viewMode = ($_GET['view'] ?? 'open') === 'closed' ? 'closed' : 'open';
         $this->view('maintenance/index', [
             'title'=>'Manutenção',
-            'rows'=>$this->repo->maintenanceRequests($viewMode),
+            'rows'=>$this->repo->maintenanceRequests($viewMode, $user),
             'teamUsers'=>$this->repo->maintenanceTeamUsers(),
             'viewMode'=>$viewMode,
             'currentUser'=>$user,
             'canDelegateMaintenance'=>$this->canDelegateMaintenance($user),
+            'canManageMaintenance'=>$this->canViewAllData($user),
         ]);
     }
 
@@ -133,13 +134,18 @@ class AppController extends Controller
         }
         $id = (int)($_POST['id'] ?? 0);
         if (($_POST['maintenance_action'] ?? '') === 'delete') {
-            $this->repo->delete('maintenance_requests', $id);
-            $_SESSION['flash'] = 'Pedido de manutenção eliminado.';
+            if ($this->canViewAllData($user)) {
+                $this->repo->delete('maintenance_requests', $id);
+                $_SESSION['flash'] = 'Pedido de manutenção eliminado.';
+            }
             $this->redirect(Url::page('maintenance'));
         }
-        $data = array_intersect_key($_POST, array_flip(['assigned_to','status','delegation_notes','priority','due_date']));
-        $data['assigned_to'] = trim((string)($data['assigned_to'] ?? ''));
-        $data['delegation_notes'] = trim((string)($data['delegation_notes'] ?? ''));
+        $data = ['assigned_to' => trim((string)($_POST['assigned_to'] ?? ''))];
+        if ($this->canViewAllData($user)) {
+            $data = array_intersect_key($_POST, array_flip(['assigned_to','status','delegation_notes','priority','due_date']));
+            $data['assigned_to'] = trim((string)($data['assigned_to'] ?? ''));
+            $data['delegation_notes'] = trim((string)($data['delegation_notes'] ?? ''));
+        }
         if ($data) {
             $this->repo->updateMaintenanceRequestWorkflow($id, $data);
             $_SESSION['flash'] = 'Pedido de manutenção atualizado.';
@@ -235,7 +241,7 @@ class AppController extends Controller
         $user = Auth::user();
         $requestedView = $_GET['view'] ?? 'pending';
         $viewMode = in_array($requestedView, ['pending', 'completed', 'billed'], true) ? $requestedView : 'pending';
-        $this->view('material/index', ['title'=>'Material', 'rows'=>$this->repo->materialRequests($viewMode), 'viewMode'=>$viewMode, 'currentUser'=>$user, 'canManageMaterial'=>$this->canManageMaterial($user), 'canEditMaterialDetails'=>$this->canEditMaterialDetails($user), 'canInvoiceMaterial'=>$this->canInvoiceMaterial($user)]);
+        $this->view('material/index', ['title'=>'Material', 'rows'=>$this->repo->materialRequests($viewMode, $user), 'viewMode'=>$viewMode, 'currentUser'=>$user, 'canManageMaterial'=>$this->canManageMaterial($user), 'canEditMaterialDetails'=>$this->canEditMaterialDetails($user), 'canInvoiceMaterial'=>$this->canInvoiceMaterial($user), 'canDeleteMaterial'=>$this->canDeleteMaterial($user)]);
     }
 
     public function saveMaterial(): void
@@ -281,7 +287,7 @@ class AppController extends Controller
         $id = (int)($_POST['id'] ?? 0);
         $request = $this->repo->find('material_requests', $id);
         if (($_POST['material_action'] ?? '') === 'delete') {
-            if ($this->canManageMaterial($user)) {
+            if ($this->canDeleteMaterial($user)) {
                 $this->repo->delete('material_requests', $id);
                 $_SESSION['flash'] = 'Pedido de material eliminado.';
             }
@@ -445,39 +451,49 @@ class AppController extends Controller
     private function canManagePurchases(?array $user = null): bool
     {
         $role = strtolower((string)($user['role'] ?? ''));
-        return in_array($role, ['admin', 'compras'], true);
+        return in_array($role, ['admin', 'rh', 'compras'], true);
     }
 
     private function canManageRequests(?array $user = null): bool
     {
         $role = strtolower((string)($user['role'] ?? ''));
-        return in_array($role, ['admin', 'compras'], true);
+        return in_array($role, ['admin', 'rh', 'compras'], true);
     }
 
     private function canDelegateMaintenance(?array $user = null): bool
     {
         $role = strtolower((string)($user['role'] ?? ''));
         $team = strtolower((string)($user['team'] ?? ''));
-        return $role === 'admin' || str_contains($role, 'manuten') || str_contains($team, 'manuten');
+        return in_array($role, ['admin', 'rh'], true) || str_contains($role, 'manuten') || str_contains($team, 'manuten');
     }
 
     private function canManageMaterial(?array $user = null): bool
     {
-        $role = strtolower((string)($user['role'] ?? ''));
-        return $role === 'admin' || $this->isMaterialTeam($user);
+        return $this->canViewAllData($user) || $this->isMaterialTeam($user);
     }
 
     private function canEditMaterialDetails(?array $user = null): bool
     {
         $role = strtolower((string)($user['role'] ?? ''));
-        return in_array($role, ['admin', 'financeiro'], true) || $this->isMaterialTeam($user);
+        return $this->canViewAllData($user) || $role === 'financeiro' || $this->isMaterialTeam($user);
     }
 
     private function canInvoiceMaterial(?array $user = null): bool
     {
         $role = strtolower((string)($user['role'] ?? ''));
         $team = strtolower((string)($user['team'] ?? ''));
-        return $role === 'admin' || $role === 'financeiro' || str_contains($team, 'financeiro');
+        return $this->canViewAllData($user) || $role === 'financeiro' || str_contains($team, 'financeiro');
+    }
+
+    private function canDeleteMaterial(?array $user = null): bool
+    {
+        return $this->canViewAllData($user);
+    }
+
+    private function canViewAllData(?array $user = null): bool
+    {
+        $role = strtolower((string)($user['role'] ?? ''));
+        return in_array($role, ['admin', 'rh'], true);
     }
 
     private function isMaterialTeam(?array $user = null): bool
@@ -495,7 +511,7 @@ class AppController extends Controller
 
     private function ensureAdminAllowed(): void
     {
-        if (strtolower((string)(Auth::user()['role'] ?? '')) !== 'admin') {
+        if (!in_array(strtolower((string)(Auth::user()['role'] ?? '')), ['admin', 'rh'], true)) {
             $this->redirect(Url::page('dashboard'));
         }
     }
