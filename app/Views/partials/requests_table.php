@@ -19,7 +19,7 @@ foreach ($requestRows as $row) {
 ?>
 <div class="table-responsive data-shell">
     <table class="table modern-table align-middle">
-        <thead><tr><th>Data</th><th>Requisitante</th><th>Equipa</th><th>Artigos</th><th>Armazéns</th><th>Qtd</th><th>Entregue</th><th>Estado</th><th>Valor</th><th class="text-end">Ações</th></tr></thead>
+        <thead><tr><th>Pedido</th><th>Data</th><th>Requisitante</th><th>Equipa</th><th>Artigos</th><th>Armazéns</th><th>Qtd</th><th>Entregue</th><th>Estado</th><th>Valor</th><th class="text-end">Ações</th></tr></thead>
         <tbody>
             <?php foreach($groupedRequests as $r):
                 $remaining=max(0,(float)$r['quantity_total']-(float)$r['delivered_total']);
@@ -31,6 +31,7 @@ foreach ($requestRows as $row) {
                 $hiddenLinesCount = max(0, count($r['lines']) - count($visibleLines));
             ?>
                 <tr>
+                    <td><span class="soft-badge" title="ID do pedido para registar no Sage">#<?= htmlspecialchars($r['id']) ?></span></td>
                     <td><?= htmlspecialchars(substr($r['created_at'],0,10)) ?></td>
                     <td><?= htmlspecialchars($r['requester']) ?></td>
                     <td><?= htmlspecialchars($r['team']) ?></td>
