@@ -410,6 +410,46 @@ class Repository extends Model
         $this->delete('requests', $id);
     }
 
+
+    public function purchaseRequests(string $view = 'pending', ?array $user = null): array
+    {
+        $closedStatuses = ['Cancelado', 'Entregue'];
+        $placeholders = implode(',', array_fill(0, count($closedStatuses), '?'));
+        $where = $view === 'completed' ? "status IN ({$placeholders})" : "status NOT IN ({$placeholders})";
+        $params = $closedStatuses;
+        if ($user && $this->isChief($user)) {
+            $where .= ' AND requester_name = ?';
+            $params[] = $user['name'] ?? '';
+        }
+        $stmt = $this->db->prepare("SELECT purchase_requests.*, (SELECT COUNT(*) FROM purchase_status_history WHERE purchase_status_history.purchase_request_id = purchase_requests.id) AS history_count FROM purchase_requests WHERE {$where} ORDER BY urgency DESC, created_at DESC");
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public function purchaseStatusHistory(int $purchaseId): array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM purchase_status_history WHERE purchase_request_id = ? ORDER BY changed_at DESC, id DESC');
+        $stmt->execute([$purchaseId]);
+        return $stmt->fetchAll();
+    }
+
+    public function updatePurchaseStatus(int $id, string $status, ?array $user = null): void
+    {
+        $request = $this->find('purchase_requests', $id);
+        if (!$request) return;
+        $oldStatus = (string)($request['status'] ?? '');
+        $this->update('purchase_requests', $id, ['status'=>$status, 'status_changed_at'=>date('Y-m-d H:i:s')]);
+        if ($oldStatus !== $status) {
+            $this->db->prepare('INSERT INTO purchase_status_history (purchase_request_id,old_status,new_status,changed_by,changed_role) VALUES (:purchase_request_id,:old_status,:new_status,:changed_by,:changed_role)')->execute([
+                'purchase_request_id'=>$id,
+                'old_status'=>$oldStatus,
+                'new_status'=>$status,
+                'changed_by'=>$user['name'] ?? 'Sistema',
+                'changed_role'=>$user['role'] ?? '',
+            ]);
+        }
+    }
+
     public function materialRequests(string $view = 'pending'): array
     {
         if ($view === 'billed') {

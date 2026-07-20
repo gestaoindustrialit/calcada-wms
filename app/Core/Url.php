@@ -15,8 +15,8 @@ class Url
         return self::base() . '/' . ltrim($path, '/');
     }
 
-    public static function page(string $page): string
+    public static function page(string $page, array $params = []): string
     {
-        return self::to('index.php') . '?page=' . rawurlencode($page);
+        return self::to('index.php') . '?' . http_build_query(array_merge(['page' => $page], $params));
     }
 }
