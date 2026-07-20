@@ -96,11 +96,64 @@ class AppController extends Controller
         $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user, $sort),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$edit, 'editLines'=>$editLines, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests, 'sort'=>$sort]);
     }
 
+
+    public function maintenance(): void
+    {
+        $user = Auth::user();
+        $viewMode = ($_GET['view'] ?? 'open') === 'closed' ? 'closed' : 'open';
+        $this->view('maintenance/index', [
+            'title'=>'Manutenção',
+            'rows'=>$this->repo->maintenanceRequests($viewMode),
+            'teamUsers'=>$this->repo->maintenanceTeamUsers(),
+            'viewMode'=>$viewMode,
+            'currentUser'=>$user,
+            'canDelegateMaintenance'=>$this->canDelegateMaintenance($user),
+        ]);
+    }
+
+    public function saveMaintenance(): void
+    {
+        $user = Auth::user();
+        $data = array_intersect_key($_POST, array_flip(['title','asset','location','description','priority','due_date']));
+        $data['requester_name'] = $user['name'] ?? '';
+        $data['requester_team'] = $user['team'] ?? '';
+        $data['assigned_to'] = $this->canDelegateMaintenance($user) ? trim((string)($_POST['assigned_to'] ?? '')) : '';
+        $data['status'] = 'Aberto';
+        $data['delegation_notes'] = trim((string)($_POST['delegation_notes'] ?? ''));
+        $this->repo->insert('maintenance_requests', $data);
+        $_SESSION['flash'] = 'Pedido de manutenção registado.';
+        $this->redirect(Url::page('maintenance'));
+    }
+
+    public function maintenanceStatus(): void
+    {
+        $user = Auth::user();
+        if (!$this->canDelegateMaintenance($user)) {
+            $this->redirect(Url::page('maintenance'));
+        }
+        $id = (int)($_POST['id'] ?? 0);
+        if (($_POST['maintenance_action'] ?? '') === 'delete') {
+            $this->repo->delete('maintenance_requests', $id);
+            $_SESSION['flash'] = 'Pedido de manutenção eliminado.';
+            $this->redirect(Url::page('maintenance'));
+        }
+        $data = array_intersect_key($_POST, array_flip(['assigned_to','status','delegation_notes','priority','due_date']));
+        $data['assigned_to'] = trim((string)($data['assigned_to'] ?? ''));
+        $data['delegation_notes'] = trim((string)($data['delegation_notes'] ?? ''));
+        if ($data) {
+            $this->repo->updateMaintenanceRequestWorkflow($id, $data);
+            $_SESSION['flash'] = 'Pedido de manutenção atualizado.';
+        }
+        $updated = $this->repo->find('maintenance_requests', $id);
+        $targetView = in_array($updated['status'] ?? '', ['Concluído', 'Cancelado'], true) ? 'closed' : 'open';
+        $this->redirect(Url::page('maintenance') . '&view=' . $targetView);
+    }
+
     public function logs(): void
     {
         $this->ensureAdminAllowed();
         $filters = array_intersect_key($_GET, array_flip(['table_name','action','q']));
-        $this->view('logs/index', ['title'=>'Logs de ações', 'rows'=>$this->repo->actionLogs($filters), 'filters'=>$filters, 'tables'=>['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','purchase_requests'], 'actions'=>['create','update','delete']]);
+        $this->view('logs/index', ['title'=>'Logs de ações', 'rows'=>$this->repo->actionLogs($filters), 'filters'=>$filters, 'tables'=>['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','maintenance_requests','purchase_requests'], 'actions'=>['create','update','delete']]);
     }
 
     public function logAction(): void
@@ -399,6 +452,13 @@ class AppController extends Controller
     {
         $role = strtolower((string)($user['role'] ?? ''));
         return in_array($role, ['admin', 'compras'], true);
+    }
+
+    private function canDelegateMaintenance(?array $user = null): bool
+    {
+        $role = strtolower((string)($user['role'] ?? ''));
+        $team = strtolower((string)($user['team'] ?? ''));
+        return $role === 'admin' || str_contains($role, 'manuten') || str_contains($team, 'manuten');
     }
 
     private function canManageMaterial(?array $user = null): bool

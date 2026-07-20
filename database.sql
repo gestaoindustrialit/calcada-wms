@@ -94,26 +94,18 @@ CREATE TABLE IF NOT EXISTS material_requests (
 );
 
 
-CREATE TABLE IF NOT EXISTS purchase_requests (
+CREATE TABLE IF NOT EXISTS maintenance_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    asset TEXT NOT NULL,
+    location TEXT NOT NULL,
+    description TEXT,
     requester_name TEXT,
     requester_team TEXT,
-    article_name TEXT NOT NULL,
-    quantity REAL NOT NULL,
-    urgency INTEGER NOT NULL DEFAULT 1,
-    link TEXT,
-    status TEXT NOT NULL DEFAULT 'Pendente',
-    status_changed_at TEXT,
+    assigned_to TEXT,
+    priority INTEGER NOT NULL DEFAULT 3,
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'Aberto',
+    delegation_notes TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS purchase_status_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    purchase_request_id INTEGER NOT NULL,
-    old_status TEXT,
-    new_status TEXT NOT NULL,
-    changed_by TEXT,
-    changed_role TEXT,
-    changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(purchase_request_id) REFERENCES purchase_requests(id)
 );
