@@ -1,6 +1,7 @@
 <?php
 namespace App\Models;
 
+use App\Core\Access;
 use App\Core\Auth;
 use App\Core\Model;
 
@@ -452,7 +453,9 @@ class Repository extends Model
 
     public function materialRequests(string $view = 'pending', ?array $user = null): array
     {
-        $scope = $this->canViewAllData($user) ? '' : ' AND requester_name = :requester_name';
+        $role = Access::role($user ?? []);
+        $canSeeMaterialQueue = Access::canViewAllData($user) || Access::isMaterialTeam($user) || $role === 'financeiro';
+        $scope = $canSeeMaterialQueue ? '' : ' AND requester_name = :requester_name';
         $params = $scope ? ['requester_name'=>$user['name'] ?? ''] : [];
         if ($view === 'billed') {
             $stmt = $this->db->prepare('SELECT * FROM material_requests WHERE billed = 1' . $scope . ' ORDER BY due_date DESC, created_at DESC');
