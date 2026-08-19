@@ -329,6 +329,11 @@ class Repository extends Model
         ];
     }
 
+    public function requestStockLocations(): array
+    {
+        return $this->db->query("SELECT item_id, warehouse_id, location, quantity FROM inventory WHERE quantity > 0 ORDER BY item_id, warehouse_id, location")->fetchAll();
+    }
+
     public function requests(?array $user = null, string $sort = 'recent'): array
     {
         $where = '';
@@ -371,19 +376,34 @@ class Repository extends Model
         return [$request];
     }
 
-    public function deliverRequest(int $id, float $quantity): void
+    public function deliverRequest(int $id, float $quantity, string $location): float
     {
         $request = $this->find('requests', $id);
-        if (!$request) return;
+        if (!$request || empty($request['warehouse_id'])) return 0;
         $remaining = max(0, (float)$request['quantity'] - (float)$request['delivered_quantity']);
         $delivered = min(max($quantity, 0), $remaining);
-        if ($delivered <= 0) return;
-        $newDelivered = (float)$request['delivered_quantity'] + $delivered;
-        $status = $newDelivered >= (float)$request['quantity'] ? 'Entregue' : 'Parcial';
-        $before = $request;
-        $this->db->prepare('UPDATE requests SET delivered_quantity = :delivered, status = :status WHERE id = :id')->execute(['delivered'=>$newDelivered,'status'=>$status,'id'=>$id]);
-        $this->logAction('requests', $id, 'update', $before, $this->find('requests', $id));
-        if (!empty($request['warehouse_id'])) $this->adjustInventory((int)$request['item_id'], (int)$request['warehouse_id'], -$delivered);
+        if ($delivered <= 0) return 0;
+
+        $location = trim($location);
+        $stockStatement = $this->db->prepare('SELECT * FROM inventory WHERE item_id = ? AND warehouse_id = ? AND location = ? LIMIT 1');
+        $stockStatement->execute([(int)$request['item_id'], (int)$request['warehouse_id'], $location]);
+        $stock = $stockStatement->fetch();
+        if (!$stock || (float)$stock['quantity'] <= 0) return 0;
+        $delivered = min($delivered, (float)$stock['quantity']);
+
+        $this->db->beginTransaction();
+        try {
+            $newDelivered = (float)$request['delivered_quantity'] + $delivered;
+            $status = $newDelivered >= (float)$request['quantity'] ? 'Entregue' : 'Parcial';
+            $this->db->prepare('UPDATE requests SET delivered_quantity = :delivered, status = :status WHERE id = :id')->execute(['delivered'=>$newDelivered,'status'=>$status,'id'=>$id]);
+            $this->logAction('requests', $id, 'update', $request, $this->find('requests', $id));
+            $this->adjustInventory((int)$request['item_id'], (int)$request['warehouse_id'], -$delivered, $location);
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+        return $delivered;
     }
 
     public function setRequestStatus(int $id, string $status): void
