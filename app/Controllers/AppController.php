@@ -94,7 +94,7 @@ class AppController extends Controller
         }
         $editLines = $edit ? $this->repo->requestGroupLines((int)$edit['id']) : [];
         $sort = $_GET['sort'] ?? 'recent';
-        $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user, $sort),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'edit'=>$edit, 'editLines'=>$editLines, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests, 'sort'=>$sort]);
+        $this->view('requests/index', ['title'=>'Requisições','rows'=>$this->repo->requests($user, $sort),'items'=>$this->repo->items(),'warehouses'=>$this->repo->warehouses(), 'stockLocations'=>$this->repo->requestStockLocations(), 'edit'=>$edit, 'editLines'=>$editLines, 'currentUser'=>$user, 'canManageRequests'=>$canManageRequests, 'sort'=>$sort]);
     }
 
 
@@ -407,8 +407,9 @@ class AppController extends Controller
             } elseif ($action === 'deliver') {
                 if (!in_array($request['status'], ['Cancelado', 'Entregue'], true)) {
                     $postedQuantities = $_POST['deliver_quantities'] ?? [];
+                    $postedLocations = $_POST['deliver_locations'] ?? [];
                     $quantity = isset($postedQuantities[$id]) ? (float)$postedQuantities[$id] : (isset($_POST['deliver_quantity']) ? (float)$_POST['deliver_quantity'] : ((float)$request['quantity'] - (float)$request['delivered_quantity']));
-                    $this->repo->deliverRequest($id, $quantity);
+                    $this->repo->deliverRequest($id, $quantity, (string)($postedLocations[$id] ?? ''));
                 }
             } elseif ($action === 'deliver_all') {
                 foreach ($this->repo->requestGroupLines($id) as $line) {
@@ -416,9 +417,10 @@ class AppController extends Controller
                         continue;
                     }
                     $postedQuantities = $_POST['deliver_quantities'] ?? [];
+                    $postedLocations = $_POST['deliver_locations'] ?? [];
                     $lineId = (int)$line['id'];
                     $quantity = isset($postedQuantities[$lineId]) ? (float)$postedQuantities[$lineId] : ((float)$line['quantity'] - (float)$line['delivered_quantity']);
-                    $this->repo->deliverRequest($lineId, $quantity);
+                    $this->repo->deliverRequest($lineId, $quantity, (string)($postedLocations[$lineId] ?? ''));
                 }
             } elseif ($action === 'cancel') {
                 $this->repo->setRequestStatus($id, 'Cancelado');
