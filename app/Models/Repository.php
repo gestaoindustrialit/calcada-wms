@@ -582,10 +582,14 @@ class Repository extends Model
             $minQuantity = 0.0;
 
             if ($name === '') { $result['errors'][] = "Linha {$line}: nome em falta."; continue; }
+            if ($designation === '' || strcasecmp($designation, $name) === 0) {
+                $result['errors'][] = "Linha {$line}: designação em falta ou igual ao código do artigo.";
+                continue;
+            }
             $stmt = $this->db->prepare('SELECT id FROM items WHERE name = ? LIMIT 1');
             $stmt->execute([$name]);
             $id = $stmt->fetchColumn();
-            $data = ['name'=>$name,'designation'=>$designation ?: $name,'unit'=>$unit ?: 'un','weighted_price'=>$price];
+            $data = ['name'=>$name,'designation'=>$designation,'unit'=>$unit ?: 'un','weighted_price'=>$price];
             if ($id) {
                 $this->update('items', (int)$id, $data);
                 $itemId = (int)$id;
@@ -670,7 +674,11 @@ class Repository extends Model
     {
         $aliases = [
             'name'=>['nome','name','artigo','referencia','ref'],
-            'designation'=>['designacao','descricao','description','designation'],
+            'designation'=>[
+                'designacao','designacao_artigo','designacao_do_artigo',
+                'descricao','descricao_artigo','descricao_do_artigo','descricao_1',
+                'description','item_description','designation',
+            ],
             'unit'=>['unidade','unit','un'],
             'price'=>['preco','preco_ponderado','p_ponderado','weighted_price','price'],
             'warehouse'=>['armazem','warehouse','deposito'],
