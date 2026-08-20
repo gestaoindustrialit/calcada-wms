@@ -262,7 +262,11 @@ body.modal-open .page-card { backdrop-filter: none; }
 .request-sort-form .form-select { min-width: 220px; }
 .request-items-list { display: grid; gap: .35rem; }
 .request-items-list span { display: block; }
-.request-items-list__more { color: var(--muted); font-weight: 800; letter-spacing: .12em; }
+.request-items-list__details summary { list-style: none; }
+.request-items-list__details summary::-webkit-details-marker { display: none; }
+.request-items-list__more { width: max-content; color: var(--muted); font-weight: 800; line-height: 1; letter-spacing: .12em; cursor: pointer; }
+.request-items-list__more:hover, .request-items-list__more:focus-visible { color: var(--primary); }
+.request-items-list__extra { display: grid; gap: .35rem; margin-top: .35rem; }
 .delivery-line { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(150px, 1fr) 100px auto; align-items: center; gap: .75rem; padding: .75rem 0; border-bottom: 1px solid var(--line); }
 .delivery-line:last-child { border-bottom: 0; }
 .delivery-actions { margin-top: 1rem; }
