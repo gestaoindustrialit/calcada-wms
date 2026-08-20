@@ -80,6 +80,18 @@ document.addEventListener('DOMContentLoaded',()=>{
     refresh();
   });
 
+  document.addEventListener('click',event=>{
+    const toggle=event.target.closest('[data-request-items-toggle]');
+    if(!toggle)return;
+    const list=toggle.closest('[data-request-items]');
+    if(!list)return;
+    const expanded=toggle.getAttribute('aria-expanded')==='true';
+    list.querySelectorAll('[data-request-item-extra]').forEach(item=>{item.hidden=expanded;});
+    toggle.setAttribute('aria-expanded',String(!expanded));
+    toggle.setAttribute('aria-label',expanded?'Mostrar todos os artigos':'Ocultar artigos adicionais');
+    toggle.title=toggle.getAttribute('aria-label');
+  });
+
   document.querySelectorAll('[data-inventory-movement-form]').forEach(form=>{
     let stock=[];
     let warehouseLocations=[];
