@@ -290,7 +290,7 @@ body.modal-open .page-card { backdrop-filter: none; }
 .material-table { min-width: 1180px; }
 .material-status { background: #e0f2fe !important; color: #075985 !important; }
 .material-status-form { display: grid; grid-template-columns: 140px 85px 140px minmax(150px, 1fr) 105px auto; gap: .35rem; align-items: center; min-width: 680px; }
-.material-notes-cell { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.material-notes-cell { max-width: 220px; }
 .material-notes-input { min-width: 150px; }
 .material-billed-check { display: inline-flex; align-items: center; gap: .35rem; margin: 0; font-size: .82rem; font-weight: 850; white-space: nowrap; }
 .material-table .bi-flag { color: #64748b; margin-right: .15rem; }
@@ -305,7 +305,17 @@ body.modal-open .page-card { backdrop-filter: none; }
 .material-department-pill { padding: .22rem .45rem; font-size: .68rem; }
 .material-urgency { display: inline-flex; align-items: center; gap: .06rem; white-space: nowrap; line-height: 1; }
 .material-table .material-urgency .bi-flag-fill { color: #64748b; font-size: .64rem; margin: 0; }
-.material-notes-cell { max-width: 150px; }
+.material-notes-cell { width: 150px; max-width: 150px; white-space: normal !important; }
+.material-notes summary { display: flex; align-items: baseline; min-width: 0; cursor: pointer; list-style: none; }
+.material-notes summary::-webkit-details-marker { display: none; }
+.material-notes__preview { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.material-notes__toggle { flex: 0 0 auto; color: var(--primary); font-weight: 900; }
+.material-notes summary:hover .material-notes__toggle,
+.material-notes summary:focus-visible .material-notes__toggle { color: #1d4ed8; }
+.material-notes[open] summary { width: max-content; margin-bottom: .35rem; }
+.material-notes[open] .material-notes__preview { display: none; }
+.material-notes[open] .material-notes__toggle::before { content: "Ocultar "; font-size: .7rem; letter-spacing: 0; }
+.material-notes__full { width: 260px; max-width: 100%; line-height: 1.45; overflow-wrap: anywhere; }
 .material-quantity-input { width: 70px; }
 .material-date-input { width: 122px; }
 .material-notes-input { width: 145px; min-width: 145px; }
