@@ -121,6 +121,50 @@ class AppController extends Controller
         ]);
     }
 
+    public function events(): void
+    {
+        $events = $this->repo->openEventsWithReservations();
+        $selectedId = (int)($_GET['event_id'] ?? ($events[0]['id'] ?? 0));
+        if (!array_filter($events, fn($event) => (int)$event['id'] === $selectedId)) $selectedId = (int)($events[0]['id'] ?? 0);
+        $this->view('events/index', ['title'=>'Admissões do evento', 'events'=>$events, 'selectedId'=>$selectedId]);
+    }
+
+    public function eventReservations(): void
+    {
+        $this->json(['reservations'=>$this->repo->eventReservations((int)($_GET['event_id'] ?? 0))]);
+    }
+
+    public function eventValidate(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->json(['ok'=>false, 'message'=>'Método inválido.'], 405);
+        $result = $this->repo->validateEventReservation((int)($_POST['event_id'] ?? 0), (string)($_POST['token'] ?? ''), (string)(Auth::user()['name'] ?? ''));
+        $this->json($result, $result['ok'] ? 200 : 422);
+    }
+
+    public function eventReset(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->json(['ok'=>false, 'message'=>'Método inválido.'], 405);
+        $ok = $this->repo->resetEventReservation((int)($_POST['event_id'] ?? 0), (int)($_POST['reservation_id'] ?? 0));
+        $this->json(['ok'=>$ok, 'message'=>$ok ? 'Reserva novamente pronta a validar.' : 'Não foi possível alterar a reserva.'], $ok ? 200 : 422);
+    }
+
+    public function eventEmail(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->json(['ok'=>false, 'message'=>'Método inválido.'], 405);
+        $reservation = $this->repo->eventReservationForEmail((int)($_POST['event_id'] ?? 0), (int)($_POST['reservation_id'] ?? 0));
+        if (!$reservation || empty($reservation['guest_email'])) $this->json(['ok'=>false, 'message'=>'Esta reserva não tem um email válido.'], 422);
+        $ok = \App\Services\EventReservationEmail::send($reservation);
+        $this->json(['ok'=>$ok, 'message'=>$ok ? 'Email de confirmação enviado.' : 'Não foi possível enviar o email. Confirma a configuração de correio.'], $ok ? 200 : 503);
+    }
+
+    private function json(array $payload, int $status = 200): never
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     public function saveMaintenance(): void
     {
         $user = Auth::user();

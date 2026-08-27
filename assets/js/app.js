@@ -1,4 +1,60 @@
 document.addEventListener('DOMContentLoaded',()=>{
+  const admissions=document.querySelector('[data-event-admissions]');
+  if(admissions&&admissions.querySelector('[data-event-select]')){
+    const select=admissions.querySelector('[data-event-select]');
+    const list=admissions.querySelector('[data-reservation-list]');
+    const counter=admissions.querySelector('[data-counter]');
+    const feedback=admissions.querySelector('[data-feedback]');
+    const tokenForm=admissions.querySelector('[data-token-form]');
+    const tokenInput=tokenForm.querySelector('[name="token"]');
+    const startButton=admissions.querySelector('[data-camera-start]');
+    const stopButton=admissions.querySelector('[data-camera-stop]');
+    let scanner=null;
+    let scanLocked=false;
+    const escape=value=>{const node=document.createElement('span');node.textContent=String(value??'');return node.innerHTML;};
+    const savedEvent=localStorage.getItem('eventAdmissions.selectedEvent');
+    if(savedEvent&&[...select.options].some(option=>option.value===savedEvent))select.value=savedEvent;
+    const showFeedback=(message,ok)=>{feedback.hidden=false;feedback.className=`admission-feedback ${ok?'is-success':'is-error'}`;feedback.innerHTML=`<i class="bi ${ok?'bi-check-circle-fill':'bi-exclamation-triangle-fill'}"></i><span>${escape(message)}</span>`;};
+    const loadReservations=async()=>{
+      list.setAttribute('aria-busy','true');
+      try{
+        const response=await fetch(`${admissions.dataset.listUrl}&event_id=${encodeURIComponent(select.value)}`,{headers:{Accept:'application/json'}});
+        const data=await response.json();
+        const rows=data.reservations||[];
+        const validated=rows.filter(row=>row.status==='Validado').length;
+        counter.textContent=`${validated} / ${rows.length}`;
+        list.innerHTML=rows.length?rows.map(row=>`<article class="reservation-row ${row.status==='Validado'?'is-validated':''}"><div class="reservation-row__icon"><i class="bi ${row.status==='Validado'?'bi-person-check-fill':'bi-person'}"></i></div><div><strong>${escape(row.guest_name)}</strong><small>${escape(row.status)}${row.validated_at?' · '+escape(row.validated_at):''}</small></div><div class="reservation-row__actions">${row.guest_email?`<button class="btn btn-sm btn-outline-primary" type="button" data-email-reservation="${Number(row.id)}" title="Enviar confirmação"><i class="bi bi-envelope"></i></button>`:''}${row.status==='Validado'?`<button class="btn btn-sm btn-outline-secondary" type="button" data-reset-reservation="${Number(row.id)}" title="Alterar para A validar">A validar</button>`:'<span class="status-waiting">Pendente</span>'}</div></article>`).join(''):'<p class="text-muted mb-0">Este evento não tem reservas.</p>';
+      }catch(error){list.innerHTML='<p class="text-danger mb-0">Não foi possível atualizar as reservas.</p>';}
+      list.removeAttribute('aria-busy');
+    };
+    const post=async(url,values)=>{
+      const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body:new URLSearchParams(values)});
+      const data=await response.json();
+      if(!response.ok)throw data;
+      return data;
+    };
+    const validate=async token=>{
+      if(scanLocked)return;
+      scanLocked=true;
+      tokenForm.querySelector('button').disabled=true;
+      try{const data=await post(admissions.dataset.validateUrl,{event_id:select.value,token});showFeedback(data.message,true);tokenInput.value='';await loadReservations();}
+      catch(error){showFeedback(error.message||'Não foi possível validar a reserva.',false);}
+      finally{setTimeout(()=>{scanLocked=false;tokenForm.querySelector('button').disabled=false;tokenInput.focus();},900);}
+    };
+    select.addEventListener('change',()=>{localStorage.setItem('eventAdmissions.selectedEvent',select.value);feedback.hidden=true;loadReservations();});
+    tokenForm.addEventListener('submit',event=>{event.preventDefault();validate(tokenInput.value.trim());});
+    list.addEventListener('click',async event=>{const button=event.target.closest('[data-reset-reservation]');if(!button)return;button.disabled=true;try{const data=await post(admissions.dataset.resetUrl,{event_id:select.value,reservation_id:button.dataset.resetReservation});showFeedback(data.message,true);await loadReservations();}catch(error){showFeedback(error.message||'Não foi possível alterar a reserva.',false);button.disabled=false;}});
+    list.addEventListener('click',async event=>{const button=event.target.closest('[data-email-reservation]');if(!button)return;button.disabled=true;try{const data=await post(admissions.dataset.emailUrl,{event_id:select.value,reservation_id:button.dataset.emailReservation});showFeedback(data.message,true);}catch(error){showFeedback(error.message||'Não foi possível enviar o email.',false);}finally{button.disabled=false;}});
+    startButton.addEventListener('click',async()=>{
+      if(typeof Html5Qrcode==='undefined'){showFeedback('O leitor de QR-Code não ficou disponível. Podes introduzir o token manualmente.',false);return;}
+      admissions.querySelector('[data-qr-reader]').id='event-qr-reader';
+      scanner=new Html5Qrcode('event-qr-reader');
+      try{await scanner.start({facingMode:'environment'},{fps:10,qrbox:(width,height)=>({width:Math.min(width,height)*.72,height:Math.min(width,height)*.72})},decoded=>validate(decoded));startButton.disabled=true;stopButton.disabled=false;}
+      catch(error){scanner=null;showFeedback('Não foi possível abrir a câmara. Confirma a permissão do navegador.',false);}
+    });
+    stopButton.addEventListener('click',async()=>{if(scanner){await scanner.stop();scanner.clear();scanner=null;}startButton.disabled=false;stopButton.disabled=true;});
+    loadReservations();
+  }
   const enhanceSearchableSelect=select=>{
     if(select.dataset.searchBound)return;
     select.dataset.searchBound='1';

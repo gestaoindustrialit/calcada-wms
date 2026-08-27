@@ -51,7 +51,7 @@ class Access
     {
         $role = self::role($user ?? []);
         if (self::canViewAllData($user)) {
-            return ['dashboard','clear_catalog','users','warehouses','items','inventory','inventory_save','requests','request_save','request_action','purchases','purchase_save','purchase_status','purchase_delete','material','material_save','material_status','material_download','maintenance','maintenance_save','maintenance_status','reports','logs','log_action','export_excel','export_pdf','logout'];
+            return ['dashboard','clear_catalog','users','warehouses','items','inventory','inventory_save','requests','request_save','request_action','purchases','purchase_save','purchase_status','purchase_delete','material','material_save','material_status','material_download','maintenance','maintenance_save','maintenance_status','events','event_reservations','event_validate','event_reset','event_email','reports','logs','log_action','export_excel','export_pdf','logout'];
         }
         if ($role === 'chefe') {
             return ['dashboard','requests','request_save','request_action','purchases','purchase_save','material','material_save','maintenance','maintenance_save','reports','export_excel','export_pdf','logout'];

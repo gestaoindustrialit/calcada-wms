@@ -112,3 +112,8 @@ CREATE TABLE IF NOT EXISTS maintenance_requests (
     delegation_notes TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, starts_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Aberto', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS event_reservations (id INTEGER PRIMARY KEY AUTOINCREMENT, event_id INTEGER NOT NULL, guest_name TEXT NOT NULL, guest_email TEXT, token TEXT NOT NULL UNIQUE, qr_code_url TEXT, status TEXT NOT NULL DEFAULT 'A validar', validated_at TEXT, validated_by TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(event_id) REFERENCES events(id));
+CREATE INDEX IF NOT EXISTS idx_event_reservations_event ON event_reservations(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_reservations_token ON event_reservations(token);
