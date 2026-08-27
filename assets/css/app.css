@@ -464,3 +464,59 @@ body.modal-open .page-card { backdrop-filter: none; }
 .maintenance-status {
     background: linear-gradient(135deg, #0f766e, #2563eb);
 }
+
+.event-admissions { max-width: 1280px; margin: 0 auto; }
+.event-admissions__head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; margin-bottom: 1.25rem; }
+.event-admissions__head h1 { margin: .25rem 0; font-size: clamp(2rem, 5vw, 3.6rem); font-weight: 950; letter-spacing: -.055em; }
+.event-admissions__head p { color: var(--muted); margin: 0; }
+.event-admissions__head .eyebrow { color: #4338ca; gap: .4rem; }
+.operation-pill { display: inline-flex; align-items: center; gap: .45rem; padding: .6rem .85rem; border-radius: 999px; background: #ecfdf3; color: #027a48; font-weight: 850; white-space: nowrap; }
+.operation-pill i { font-size: .55rem; }
+.event-admissions__grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); gap: 1rem; align-items: start; }
+.admission-scanner, .reservation-panel { border-radius: 22px; }
+.scanner-frame { min-height: 310px; margin: 1rem 0; display: grid; place-items: center; overflow: hidden; border: 1px solid #d8dee8; border-radius: 18px; background: #f5f7fa; }
+.scanner-frame video { object-fit: cover; }
+.scanner-placeholder { display: grid; justify-items: center; gap: .35rem; color: var(--muted); }
+.scanner-placeholder i { font-size: 3.5rem; color: #98a2b3; }
+.scanner-actions { display: grid; grid-template-columns: 1fr auto; gap: .7rem; }
+.scanner-actions .btn { min-height: 50px; }
+.token-form { display: grid; grid-template-columns: 1fr auto; gap: .7rem; margin-top: .75rem; }
+.admission-feedback { display: flex; align-items: center; gap: .65rem; margin-top: .8rem; padding: .8rem 1rem; border-radius: 14px; font-weight: 800; }
+.admission-feedback.is-success { color: #027a48; background: #ecfdf3; }
+.admission-feedback.is-error { color: #b42318; background: #fef3f2; }
+.reservation-panel__head { display: flex; justify-content: space-between; align-items: center; padding-bottom: .8rem; border-bottom: 1px solid var(--line); }
+.reservation-panel__head h2 { margin: .15rem 0 0; font-size: 1.2rem; font-weight: 900; }
+.reservation-panel__head > strong { padding: .4rem .65rem; border-radius: 10px; background: var(--brand-soft); color: #3730a3; }
+.reservation-list { display: grid; gap: .5rem; margin-top: .8rem; max-height: 570px; overflow: auto; }
+.reservation-row { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: .65rem; align-items: center; padding: .7rem; border: 1px solid var(--line); border-radius: 15px; }
+.reservation-row.is-validated { background: #f0fdf4; border-color: #bbf7d0; }
+.reservation-row__icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: #eef2ff; color: #4338ca; font-size: 1.15rem; }
+.reservation-row.is-validated .reservation-row__icon { background: #dcfce7; color: #15803d; }
+.reservation-row strong, .reservation-row small { display: block; overflow-wrap: anywhere; }
+.reservation-row small { color: var(--muted); font-size: .76rem; }
+.reservation-row__actions { display: flex; align-items: center; justify-content: flex-end; gap: .4rem; }
+.status-waiting { color: #b45309; font-size: .75rem; font-weight: 850; }
+.event-empty { text-align: center; padding: clamp(3rem, 10vw, 7rem) 1rem; border: 1px dashed #cbd5e1; border-radius: 22px; background: rgba(255,255,255,.7); }
+.event-empty > i { font-size: 3rem; color: #818cf8; }
+.event-empty h2 { margin: .75rem 0 .25rem; font-weight: 900; }
+.event-empty p { color: var(--muted); }
+
+@media (max-width: 800px) {
+  main.container-fluid { padding: .65rem; }
+  .page-card { padding: .85rem; border-radius: 20px; }
+  .event-admissions__head { display: block; }
+  .operation-pill { margin-top: .75rem; }
+  .event-admissions__grid { grid-template-columns: 1fr; }
+  .scanner-frame { min-height: 260px; }
+  .reservation-panel { order: 2; }
+}
+
+@media (max-width: 480px) {
+  .event-admissions__head h1 { font-size: 2.2rem; }
+  .scanner-frame { min-height: 225px; }
+  .scanner-actions, .token-form { grid-template-columns: 1fr; }
+  .scanner-actions .btn, .token-form .btn { width: 100%; min-height: 50px; }
+  .reservation-row { grid-template-columns: 38px minmax(0,1fr); }
+  .reservation-row__actions { grid-column: 1 / -1; width: 100%; }
+  .reservation-row__actions .btn:not(.btn-sm) { width: 100%; }
+}

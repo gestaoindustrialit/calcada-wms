@@ -7,7 +7,48 @@ use App\Core\Model;
 
 class Repository extends Model
 {
-    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','maintenance_requests','purchase_requests','action_logs'];
+    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','maintenance_requests','purchase_requests','action_logs','events','event_reservations'];
+
+    public function openEventsWithReservations(): array
+    {
+        return $this->db->query("SELECT events.*, COUNT(event_reservations.id) reservation_count, SUM(CASE WHEN event_reservations.status = 'Validado' THEN 1 ELSE 0 END) validated_count FROM events JOIN event_reservations ON event_reservations.event_id = events.id WHERE events.status = 'Aberto' GROUP BY events.id ORDER BY datetime(events.starts_at), events.name")->fetchAll();
+    }
+
+    public function eventReservations(int $eventId): array
+    {
+        $stmt = $this->db->prepare('SELECT id, event_id, guest_name, guest_email, token, status, validated_at FROM event_reservations WHERE event_id = ? ORDER BY guest_name');
+        $stmt->execute([$eventId]);
+        return $stmt->fetchAll();
+    }
+
+    public function eventReservationForEmail(int $eventId, int $reservationId): ?array
+    {
+        $stmt = $this->db->prepare('SELECT event_reservations.*, events.name event_name, events.starts_at FROM event_reservations JOIN events ON events.id = event_reservations.event_id WHERE event_reservations.id = ? AND events.id = ?');
+        $stmt->execute([$reservationId, $eventId]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public function validateEventReservation(int $eventId, string $token, string $user): array
+    {
+        $token = trim($token);
+        if ($eventId < 1 || $token === '') return ['ok'=>false, 'message'=>'Seleciona um evento e lê um QR-Code válido.'];
+        $stmt = $this->db->prepare("UPDATE event_reservations SET status = 'Validado', validated_at = CURRENT_TIMESTAMP, validated_by = :user WHERE event_id = :event_id AND token = :token AND status = 'A validar'");
+        $stmt->execute(['user'=>$user, 'event_id'=>$eventId, 'token'=>$token]);
+        $find = $this->db->prepare('SELECT id, guest_name, status FROM event_reservations WHERE event_id = ? AND token = ?');
+        $find->execute([$eventId, $token]);
+        $reservation = $find->fetch();
+        if (!$reservation) return ['ok'=>false, 'message'=>'Esta reserva não pertence ao evento selecionado.'];
+        if ($stmt->rowCount() === 0) return ['ok'=>false, 'duplicate'=>true, 'message'=>'Este QR-Code já foi validado. Altera primeiro o estado para “A validar”.', 'reservation'=>$reservation];
+        return ['ok'=>true, 'message'=>'Entrada validada com sucesso.', 'reservation'=>$reservation];
+    }
+
+    public function resetEventReservation(int $eventId, int $reservationId): bool
+    {
+        $stmt = $this->db->prepare("UPDATE event_reservations SET status = 'A validar', validated_at = NULL, validated_by = NULL WHERE id = ? AND event_id = ?");
+        $stmt->execute([$reservationId, $eventId]);
+        return $stmt->rowCount() === 1;
+    }
 
     public function all(string $table): array
     {
