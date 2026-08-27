@@ -18,6 +18,19 @@ class Access
         $role = self::role($user ?? []);
         return in_array($role, ['admin', 'rh'], true);
     }
+    public static function hasPermission(?array $user, string $permission): bool
+    {
+        $permissions = json_decode((string)($user['permissions'] ?? '{}'), true);
+        return is_array($permissions) && !empty($permissions[$permission]);
+    }
+    public static function canViewAllRequests(?array $user): bool
+    {
+        return self::canViewAllData($user) || self::hasPermission($user, 'view_all_requests');
+    }
+    public static function canViewMaterialQueue(?array $user): bool
+    {
+        return self::canViewAllData($user) || self::isMaterialTeam($user) || self::hasPermission($user, 'view_material_queue');
+    }
 
     public static function isMaterialTeam(?array $user): bool
     {
@@ -52,7 +65,7 @@ class Access
         if ($role === 'financeiro') {
             return ['dashboard','material','material_status','material_download','reports','export_excel','export_pdf','logout'];
         }
-        if (self::isMaterialTeam($user)) {
+        if (self::isMaterialTeam($user) || self::hasPermission($user, 'view_material_queue') || self::hasPermission($user, 'manage_material')) {
             return ['dashboard','requests','request_save','purchases','purchase_save','material','material_save','material_status','material_download','maintenance','maintenance_save','logout'];
         }
         if (self::isMaintenanceTeam($user)) {

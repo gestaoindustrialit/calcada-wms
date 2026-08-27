@@ -72,6 +72,7 @@ $departmentOptions = ['Desenho técnico 3D', 'Tornearia', 'Desenho técnico 3D e
             <div class="modal-body material-edit-grid">
                 <?php if($canManageMaterial): ?>
                 <div><label class="form-label">Estado</label><select class="form-select" name="status"><?php foreach($statusOptions as $status): ?><option value="<?= htmlspecialchars($status) ?>" <?= $row['status']===$status?'selected':'' ?>><?= htmlspecialchars($status) ?></option><?php endforeach; ?></select><small class="text-muted">Ao concluir, a data de entrega passa a ser a data de hoje.</small></div>
+                <div><label class="form-label">Departamento</label><select class="form-select" name="department"><?php foreach($departmentOptions as $department): ?><option value="<?= htmlspecialchars($department) ?>" <?= $row['department']===$department?'selected':'' ?>><?= htmlspecialchars($department) ?></option><?php endforeach; ?></select></div>
                 <div><label class="form-label">Qtd Entregue</label><input class="form-control" name="completed_quantity" type="number" min="0" step="0.01" value="<?= htmlspecialchars($row['completed_quantity']) ?>"></div>
                 <?php endif; ?>
                 <?php if($canEditMaterialDetails): ?>
