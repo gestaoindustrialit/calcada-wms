@@ -371,7 +371,7 @@ class Repository extends Model
     {
         $where = '';
         $params = [];
-        if ($user && !$this->canViewAllData($user) && strtolower((string)($user['role'] ?? '')) !== 'compras') {
+        if ($user && !Access::canViewAllRequests($user) && strtolower((string)($user['role'] ?? '')) !== 'compras') {
             $where = 'WHERE requests.requester = :name';
             $params = ['name'=>$user['name'] ?? ''];
         }
@@ -414,7 +414,7 @@ class Repository extends Model
         $request = $this->find('requests', $id);
         if (!$request || empty($request['warehouse_id'])) return 0;
         $remaining = max(0, (float)$request['quantity'] - (float)$request['delivered_quantity']);
-        $delivered = min(max($quantity, 0), $remaining);
+        $delivered = max($quantity, 0);
         if ($delivered <= 0) return 0;
 
         $location = trim($location);
@@ -427,8 +427,9 @@ class Repository extends Model
         $this->db->beginTransaction();
         try {
             $newDelivered = (float)$request['delivered_quantity'] + $delivered;
-            $status = $newDelivered >= (float)$request['quantity'] ? 'Entregue' : 'Parcial';
-            $this->db->prepare('UPDATE requests SET delivered_quantity = :delivered, status = :status WHERE id = :id')->execute(['delivered'=>$newDelivered,'status'=>$status,'id'=>$id]);
+            $newRequested = max((float)$request['quantity'], $newDelivered);
+            $status = $newDelivered >= $newRequested ? 'Entregue' : 'Parcial';
+            $this->db->prepare('UPDATE requests SET quantity = :quantity, delivered_quantity = :delivered, status = :status WHERE id = :id')->execute(['quantity'=>$newRequested,'delivered'=>$newDelivered,'status'=>$status,'id'=>$id]);
             $this->logAction('requests', $id, 'update', $request, $this->find('requests', $id));
             $this->adjustInventory((int)$request['item_id'], (int)$request['warehouse_id'], -$delivered, $location);
             $this->db->commit();
@@ -507,7 +508,7 @@ class Repository extends Model
     public function materialRequests(string $view = 'pending', ?array $user = null): array
     {
         $role = Access::role($user ?? []);
-        $canSeeMaterialQueue = Access::canViewAllData($user) || Access::isMaterialTeam($user) || $role === 'financeiro';
+        $canSeeMaterialQueue = Access::canViewMaterialQueue($user) || $role === 'financeiro';
         $scope = $canSeeMaterialQueue ? '' : ' AND requester_name = :requester_name';
         $params = $scope ? ['requester_name'=>$user['name'] ?? ''] : [];
         if ($view === 'billed') {
@@ -815,21 +816,21 @@ class Repository extends Model
 
     public function articleSpend(?array $user = null): array
     {
-        $filter = !$this->canViewAllData($user) ? 'WHERE requests.requester = :name' : '';
-        $stmt = $this->db->prepare("SELECT items.name item, ROUND(SUM(requests.quantity*items.weighted_price),2) total FROM requests JOIN items ON items.id=requests.item_id {$filter} GROUP BY items.id ORDER BY total DESC LIMIT 8");
-        $stmt->execute($filter ? ['name'=>$user['name'] ?? ''] : []); return $stmt->fetchAll();
+        $filter = !Access::canViewAllRequests($user) ? "WHERE requests.requester = :name AND requests.status != 'Cancelado'" : "WHERE requests.status != 'Cancelado'";
+        $stmt = $this->db->prepare("SELECT items.name item, ROUND(SUM(requests.quantity),2) total FROM requests JOIN items ON items.id=requests.item_id {$filter} GROUP BY items.id ORDER BY total DESC LIMIT 8");
+        $stmt->execute(str_contains($filter, ':name') ? ['name'=>$user['name'] ?? ''] : []); return $stmt->fetchAll();
     }
 
 
     public function monthlyByTeam(?array $user = null): array
     {
-        $filter = !$this->canViewAllData($user) ? 'WHERE requests.requester = :name' : '';
+        $filter = !Access::canViewAllRequests($user) ? "WHERE requests.requester = :name AND requests.status != 'Cancelado'" : "WHERE requests.status != 'Cancelado'";
         $stmt = $this->db->prepare("SELECT strftime('%Y-%m', requests.created_at) AS month, requests.team,
-            ROUND(SUM(requests.quantity * items.weighted_price),2) AS total
+            ROUND(SUM(requests.quantity),2) AS total
             FROM requests JOIN items ON items.id=requests.item_id
             {$filter}
             GROUP BY month, requests.team ORDER BY month ASC");
-        $stmt->execute($filter ? ['name'=>$user['name'] ?? ''] : []);
+        $stmt->execute(str_contains($filter, ':name') ? ['name'=>$user['name'] ?? ''] : []);
         return $stmt->fetchAll();
     }
 
@@ -840,8 +841,7 @@ class Repository extends Model
 
     private function canViewAllData(?array $user = null): bool
     {
-        $role = strtolower((string)($user['role'] ?? ''));
-        return in_array($role, ['admin', 'rh'], true);
+        return Access::canViewAllData($user);
     }
 
     private function guardTable(string $table): void

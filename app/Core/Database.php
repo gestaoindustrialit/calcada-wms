@@ -40,6 +40,7 @@ class Database
         }
         self::ensureColumn('requests', 'warehouse_id', 'INTEGER');
         self::ensureColumn('users', 'password_hash', 'TEXT');
+        self::ensureColumn('users', 'permissions', "TEXT NOT NULL DEFAULT '{}'");
         self::ensureColumn('requests', 'delivered_quantity', 'REAL NOT NULL DEFAULT 0');
         self::ensureColumn('requests', 'request_group', 'TEXT');
         self::ensureColumn('inventory', 'location', "TEXT NOT NULL DEFAULT ''");

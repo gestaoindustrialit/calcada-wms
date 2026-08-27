@@ -14,5 +14,5 @@
 </div>
 <?php endif; ?>
 <div class="row g-3 mb-4"><?php foreach([['Gastos semanais',$stats['spending']['week']],['Despesa mensal',$stats['spending']['month']],['Gastos anuais',$stats['spending']['year']]] as $m): ?><div class="col-md-4"><div class="card spend-card"><div class="card-body"><small><?= $m[0] ?></small><h3>€ <?= number_format((float)$m[1],2,',','.') ?></h3></div></div></div><?php endforeach; ?></div>
-<div class="chart-panel mb-4"><h2>Gastos por artigo</h2><canvas id="articleSpendChart"></canvas></div><script>window.articleSpend=<?= json_encode(['labels'=>array_column($stats['article_spend'],'item'),'data'=>array_map('floatval',array_column($stats['article_spend'],'total'))], JSON_UNESCAPED_UNICODE) ?>;</script>
+<div class="chart-panel mb-4"><h2>Quantidades pedidas por artigo</h2><canvas id="articleSpendChart"></canvas></div><script>window.articleSpend=<?= json_encode(['labels'=>array_column($stats['article_spend'],'item'),'data'=>array_map('floatval',array_column($stats['article_spend'],'total'))], JSON_UNESCAPED_UNICODE) ?>;</script>
 <h2>Últimos pedidos</h2><?php $rows=array_slice($requests,0,5); require dirname(__DIR__).'/partials/requests_table.php'; ?>
