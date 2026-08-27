@@ -42,7 +42,15 @@ class AppController extends Controller
         }
         $this->redirect(Url::page('dashboard'));
     }
-    public function users(): void { $this->ensureAdminAllowed(); $this->crud('users', ['name','email','role','team','password_hash'], 'users/index', 'Utilizadores', ['roles'=>$this->repo->roles()]); }
+    public function users(): void
+    {
+        $this->ensureAdminAllowed();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $selected = is_array($_POST['permissions'] ?? null) ? $_POST['permissions'] : [];
+            $_POST['permissions'] = json_encode(array_fill_keys(array_intersect(['view_all_requests','view_material_queue','manage_material'], $selected), true));
+        }
+        $this->crud('users', ['name','email','role','team','password_hash','permissions'], 'users/index', 'Utilizadores', ['roles'=>$this->repo->roles()]);
+    }
     public function warehouses(): void
     {
         $this->ensureChiefAllowed();
@@ -305,6 +313,9 @@ class AppController extends Controller
         }
         if ($this->canEditMaterialDetails($user)) {
             $data['executor_notes'] = trim((string)($_POST['executor_notes'] ?? ''));
+            if (Access::canViewMaterialQueue($user) && isset($_POST['department'])) {
+                $data['department'] = trim((string)$_POST['department']);
+            }
         }
         if ($this->canInvoiceMaterial($user)) {
             $data['billed'] = isset($_POST['billed']) ? 1 : 0;
@@ -472,13 +483,13 @@ class AppController extends Controller
 
     private function canManageMaterial(?array $user = null): bool
     {
-        return $this->canViewAllData($user) || $this->isMaterialTeam($user);
+        return $this->canViewAllData($user) || $this->isMaterialTeam($user) || Access::hasPermission($user, 'manage_material');
     }
 
     private function canEditMaterialDetails(?array $user = null): bool
     {
         $role = strtolower((string)($user['role'] ?? ''));
-        return $this->canViewAllData($user) || $role === 'financeiro' || $this->isMaterialTeam($user);
+        return $this->canViewAllData($user) || $role === 'financeiro' || $this->isMaterialTeam($user) || Access::hasPermission($user, 'manage_material');
     }
 
     private function canInvoiceMaterial(?array $user = null): bool

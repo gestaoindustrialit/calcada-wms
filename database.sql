@@ -5,8 +5,11 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL,
     team TEXT NOT NULL DEFAULT 'Geral',
     password_hash TEXT,
+    permissions TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS purchase_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, article_name TEXT NOT NULL, quantity REAL NOT NULL, urgency INTEGER NOT NULL DEFAULT 1, link TEXT, requester_name TEXT, requester_team TEXT, status TEXT NOT NULL DEFAULT 'Pendente', status_changed_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS purchase_status_history (id INTEGER PRIMARY KEY AUTOINCREMENT, purchase_request_id INTEGER NOT NULL, old_status TEXT, new_status TEXT NOT NULL, changed_by TEXT, changed_role TEXT, changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(purchase_request_id) REFERENCES purchase_requests(id));
 CREATE TABLE IF NOT EXISTS warehouses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
