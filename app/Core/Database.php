@@ -34,6 +34,10 @@ class Database
     {
         $sql = file_get_contents(dirname(__DIR__, 2) . '/database.sql');
         self::$pdo->exec($sql);
+        if ((int) self::$pdo->query('SELECT COUNT(*) FROM events')->fetchColumn() === 0) {
+            $stmt = self::$pdo->prepare("INSERT INTO events (title, venue, starts_at, description, capacity, reservations_enabled) VALUES (?, ?, ?, ?, ?, 1)");
+            $stmt->execute(['Evento de hoje', 'Auditório principal', date('Y-m-d 20:30:00'), 'Uma experiência preparada para receber todos os participantes.', 120]);
+        }
         self::ensureColumn('requests', 'warehouse_id', 'INTEGER');
         self::ensureColumn('users', 'password_hash', 'TEXT');
         self::ensureColumn('users', 'permissions', "TEXT NOT NULL DEFAULT '{}'");

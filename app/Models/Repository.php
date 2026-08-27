@@ -7,7 +7,40 @@ use App\Core\Model;
 
 class Repository extends Model
 {
-    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','maintenance_requests','purchase_requests','action_logs'];
+    private array $allowedTables = ['users','warehouses','warehouse_locations','items','inventory','requests','material_requests','maintenance_requests','action_logs','events','event_reservations'];
+
+    public function event(int $id): ?array
+    {
+        $stmt = $this->db->prepare('SELECT events.*, COALESCE(SUM(event_reservations.tickets), 0) reserved FROM events LEFT JOIN event_reservations ON event_reservations.event_id = events.id WHERE events.id = ? GROUP BY events.id');
+        $stmt->execute([$id]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public function todayEvent(): ?array
+    {
+        $row = $this->db->query("SELECT * FROM events WHERE date(starts_at) = date('now','localtime') ORDER BY starts_at LIMIT 1")->fetch();
+        return $row ?: null;
+    }
+
+    public function eventReservations(int $eventId): array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM event_reservations WHERE event_id = ? ORDER BY admitted_at IS NOT NULL, customer_name');
+        $stmt->execute([$eventId]);
+        return $stmt->fetchAll();
+    }
+
+    public function createEventReservation(array $data): int
+    {
+        $stmt = $this->db->prepare('INSERT INTO event_reservations (event_id, customer_name, customer_email, customer_phone, tickets, notes, privacy_accepted_at, privacy_version, privacy_ip) VALUES (:event_id, :customer_name, :customer_email, :customer_phone, :tickets, :notes, :privacy_accepted_at, :privacy_version, :privacy_ip)');
+        $stmt->execute($data);
+        return (int)$this->db->lastInsertId();
+    }
+
+    public function admitReservation(int $id, int $eventId): void
+    {
+        $stmt = $this->db->prepare('UPDATE event_reservations SET admitted_at = COALESCE(admitted_at, CURRENT_TIMESTAMP) WHERE id = ? AND event_id = ?');
+        $stmt->execute([$id, $eventId]);
+    }
 
     public function all(string $table): array
     {

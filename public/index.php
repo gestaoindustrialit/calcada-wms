@@ -11,8 +11,13 @@ use App\Core\Url;
 use App\Controllers\AppController;
 
 $controller = new AppController();
+Auth::start();
 $page = $_GET['page'] ?? 'dashboard';
-$publicRoutes = ['login'];
+$publicRoutes = ['login','event','event_reserve','admissions_login','admissions','admissions_logout','admit'];
+if (in_array($page, ['admissions','admit'], true) && empty($_SESSION['admissions_logged_in'])) {
+    header('Location: ' . Url::page('admissions_login'));
+    exit;
+}
 if (!in_array($page, $publicRoutes, true) && !Auth::check()) {
     header('Location: ' . Url::page('login'));
     exit;
@@ -24,6 +29,12 @@ if (!in_array($page, $publicRoutes, true) && !Access::canAccessPage(Auth::user()
 $routes = [
     'login'=>fn()=> $controller->login(),
     'logout'=>fn()=> $controller->logout(),
+    'event'=>fn()=> $controller->event(),
+    'event_reserve'=>fn()=> $controller->reserveEvent(),
+    'admissions_login'=>fn()=> $controller->admissionsLogin(),
+    'admissions_logout'=>fn()=> $controller->admissionsLogout(),
+    'admissions'=>fn()=> $controller->admissions(),
+    'admit'=>fn()=> $controller->admit(),
     'dashboard'=>fn()=> $controller->dashboard(),
     'clear_catalog'=>fn()=> $controller->clearCatalog(),
     'users'=>fn()=> $controller->users(),

@@ -30,6 +30,60 @@ class AppController extends Controller
         Auth::logout();
         $this->redirect(Url::page('login'));
     }
+
+    public function event(): void
+    {
+        $event = $this->repo->event((int)($_GET['id'] ?? 0));
+        if (!$event) { http_response_code(404); $this->view('events/public', ['title'=>'Evento não encontrado', 'event'=>null, 'hideNav'=>true]); return; }
+        $this->view('events/public', ['title'=>$event['title'], 'event'=>$event, 'hideNav'=>true, 'success'=>isset($_GET['reserved'])]);
+    }
+
+    public function reserveEvent(): void
+    {
+        $eventId = (int)($_POST['event_id'] ?? 0);
+        $event = $this->repo->event($eventId);
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$event || !(int)$event['reservations_enabled']) { http_response_code(404); return; }
+        $tickets = max(1, min(20, (int)($_POST['tickets'] ?? 1)));
+        if (empty($_POST['privacy_consent'])) {
+            $this->view('events/public', ['title'=>$event['title'], 'event'=>$event, 'hideNav'=>true, 'error'=>'Para concluir a reserva, tem de aceitar o tratamento dos dados pessoais.']); return;
+        }
+        $this->repo->createEventReservation([
+            'event_id'=>$eventId, 'customer_name'=>trim((string)($_POST['name'] ?? '')), 'customer_email'=>trim((string)($_POST['email'] ?? '')),
+            'customer_phone'=>trim((string)($_POST['phone'] ?? '')), 'tickets'=>$tickets, 'notes'=>trim((string)($_POST['notes'] ?? '')),
+            'privacy_accepted_at'=>date('Y-m-d H:i:s'), 'privacy_version'=>'RGPD-UE-v1-2026', 'privacy_ip'=>substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
+        ]);
+        $this->redirect(Url::page('event', ['id'=>$eventId, 'reserved'=>1]));
+    }
+
+    public function admissionsLogin(): void
+    {
+        Auth::start();
+        if (!empty($_SESSION['admissions_logged_in'])) { $this->redirect(Url::page('admissions')); }
+        $error = null;
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $user = getenv('ADMISSIONS_USER') ?: 'admissoes'; $password = getenv('ADMISSIONS_PASSWORD') ?: 'admissoes123';
+            if (hash_equals($user, (string)($_POST['username'] ?? '')) && hash_equals($password, (string)($_POST['password'] ?? ''))) {
+                session_regenerate_id(true); $_SESSION['admissions_logged_in'] = true; $this->redirect(Url::page('admissions'));
+            }
+            $error = 'Credenciais inválidas.';
+        }
+        $this->view('admissions/login', ['title'=>'Controlo de admissões', 'hideNav'=>true, 'error'=>$error]);
+    }
+
+    public function admissionsLogout(): void { Auth::start(); unset($_SESSION['admissions_logged_in']); $this->redirect(Url::page('admissions_login')); }
+
+    public function admissions(): void
+    {
+        $event = $this->repo->todayEvent();
+        $reservations = $event ? $this->repo->eventReservations((int)$event['id']) : [];
+        $this->view('admissions/index', ['title'=>'Admissões', 'hideNav'=>true, 'event'=>$event, 'reservations'=>$reservations]);
+    }
+
+    public function admit(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') $this->repo->admitReservation((int)($_POST['reservation_id'] ?? 0), (int)($_POST['event_id'] ?? 0));
+        $this->redirect(Url::page('admissions'));
+    }
     public function dashboard(): void { $user = Auth::user(); $this->view('dashboard/index', ['title'=>'Painel', 'stats'=>$this->repo->dashboard($user), 'requests'=>$this->repo->requests($user), 'currentUser'=>$user]); }
     public function clearCatalog(): void
     {

@@ -112,3 +112,30 @@ CREATE TABLE IF NOT EXISTS maintenance_requests (
     delegation_notes TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    venue TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    description TEXT,
+    capacity INTEGER,
+    reservations_enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS event_reservations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    customer_name TEXT NOT NULL,
+    customer_email TEXT NOT NULL,
+    customer_phone TEXT,
+    tickets INTEGER NOT NULL DEFAULT 1,
+    notes TEXT,
+    privacy_accepted_at TEXT NOT NULL,
+    privacy_version TEXT NOT NULL,
+    privacy_ip TEXT,
+    admitted_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(event_id) REFERENCES events(id)
+);
