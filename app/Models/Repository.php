@@ -173,7 +173,7 @@ class Repository extends Model
     public function roles(): array
     {
         $rows = $this->db->query("SELECT DISTINCT role FROM users WHERE TRIM(role) != '' ORDER BY role ASC")->fetchAll();
-        $roles = array_values(array_unique(array_filter(array_merge(['Admin', 'RH', 'Chefe', 'Compras', 'Stock'], array_column($rows, 'role')))));
+        $roles = array_values(array_unique(array_filter(array_merge(['Admin', 'RH', 'Chefe', 'Compras', 'Stock', 'Manutenção', 'Responsável Manutenção'], array_column($rows, 'role')))));
         natcasesort($roles);
         return array_values($roles);
     }
@@ -506,7 +506,7 @@ class Repository extends Model
     {
         $where = $view === 'closed' ? "WHERE status IN ('Concluído', 'Cancelado')" : "WHERE status NOT IN ('Concluído', 'Cancelado')";
         $params = [];
-        if (!$this->canViewAllData($user)) {
+        if (!$this->canViewAllData($user) && !\App\Core\Access::isMaintenanceTeam($user)) {
             $where .= ' AND requester_name = :requester_name';
             $params['requester_name'] = $user['name'] ?? '';
         }
