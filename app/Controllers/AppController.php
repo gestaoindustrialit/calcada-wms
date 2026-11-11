@@ -117,7 +117,8 @@ class AppController extends Controller
             'viewMode'=>$viewMode,
             'currentUser'=>$user,
             'canDelegateMaintenance'=>$this->canDelegateMaintenance($user),
-            'canManageMaintenance'=>$this->canViewAllData($user),
+            'canManageMaintenance'=>Access::canManageMaintenance($user),
+            'canDeleteMaintenance'=>$this->canViewAllData($user),
         ]);
     }
 
@@ -150,7 +151,7 @@ class AppController extends Controller
             $this->redirect(Url::page('maintenance'));
         }
         $data = ['assigned_to' => trim((string)($_POST['assigned_to'] ?? ''))];
-        if ($this->canViewAllData($user)) {
+        if (Access::canManageMaintenance($user)) {
             $data = array_intersect_key($_POST, array_flip(['assigned_to','status','delegation_notes','priority','due_date']));
             $data['assigned_to'] = trim((string)($data['assigned_to'] ?? ''));
             $data['delegation_notes'] = trim((string)($data['delegation_notes'] ?? ''));
