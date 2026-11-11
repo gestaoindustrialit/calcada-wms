@@ -4,6 +4,7 @@ use App\Core\Url;
 $isClosedView = ($viewMode ?? 'open') === 'closed';
 $canDelegateMaintenance = !empty($canDelegateMaintenance);
 $canManageMaintenance = !empty($canManageMaintenance);
+$canDeleteMaintenance = !empty($canDeleteMaintenance);
 $statusOptions = ['Aberto', 'Delegado', 'Em execução', 'A aguardar peças', 'Concluído', 'Cancelado'];
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
@@ -75,7 +76,7 @@ unset($_SESSION['flash']);
                 <div class="col-md-6"><label class="form-label">Data limite</label><input class="form-control" name="due_date" type="date" value="<?= htmlspecialchars($row['due_date'] ?? '') ?>"></div>
                 <div class="col-12"><label class="form-label">Notas de delegação</label><textarea class="form-control" name="delegation_notes" rows="3"><?= htmlspecialchars($row['delegation_notes'] ?? '') ?></textarea></div><?php endif; ?>
             </div>
-            <div class="modal-footer"><?php if($canManageMaintenance): ?><button class="btn btn-outline-danger me-auto" name="maintenance_action" value="delete" onclick="return confirm('Eliminar este pedido de manutenção?')"><i class="bi bi-trash"></i> Eliminar</button><?php endif; ?><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" name="maintenance_action" value="save"><i class="bi bi-check-lg"></i> Guardar</button></div>
+            <div class="modal-footer"><?php if($canDeleteMaintenance): ?><button class="btn btn-outline-danger me-auto" name="maintenance_action" value="delete" onclick="return confirm('Eliminar este pedido de manutenção?')"><i class="bi bi-trash"></i> Eliminar</button><?php endif; ?><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" name="maintenance_action" value="save"><i class="bi bi-check-lg"></i> Guardar</button></div>
         </form>
     </div>
 </div>
