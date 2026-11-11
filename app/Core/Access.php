@@ -74,6 +74,13 @@ class Access
         return ['dashboard','requests','request_save','purchases','purchase_save','maintenance','maintenance_save','logout'];
     }
 
+    public static function canManageMaintenance(?array $user): bool
+    {
+        $role = self::role($user ?? []);
+        return self::canViewAllData($user)
+            || in_array($role, ['responsável manutenção', 'responsavel manutencao', 'responsável de manutenção', 'responsavel de manutencao'], true);
+    }
+
     public static function canAccessPage(?array $user, string $page): bool
     {
         return in_array($page, self::allowedPages($user), true);
